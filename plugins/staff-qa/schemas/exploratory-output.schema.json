@@ -1,0 +1,689 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-qa:exploratory-output:1.0.0",
+  "title": "Exploratory read-stage output",
+  "description": "Structured output of the exploratory read stage (S-QA-035). mode charter drafts a charter (S-QA-033); mode session reports a timeboxed session (S-QA-034). Free-text fields are quoted data, at most 2,000 characters each (S-SEC-002). Stage 1 writes only the charter and one session comment on the ticket, draft defect tickets, requirement-defect items and private reports; discovered notes are stage-1 drafts on the session ticket (S-QA-018).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "area",
+    "trigger",
+    "mode",
+    "ticket",
+    "charter",
+    "decision_summary",
+    "session_notes",
+    "bug_drafts",
+    "defect_items",
+    "questions",
+    "candidate_tests",
+    "discovered",
+    "private_reports",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "exploratory"
+    },
+    "area": {
+      "$ref": "#/$defs/area"
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "req_implemented",
+            "operator_qa_explore",
+            "operator_dispatch",
+            "review_or_answer"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "mode": {
+      "enum": [
+        "charter",
+        "session"
+      ]
+    },
+    "ticket": {
+      "description": "The REQ's ticket or the session ticket.",
+      "$ref": "#/$defs/ref"
+    },
+    "charter": {
+      "description": "Explore <explore> with <with> to discover <to_discover> (S-QA-033).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "explore",
+        "with",
+        "to_discover",
+        "to_discover_source",
+        "timebox_minutes",
+        "build_digest",
+        "req_ids"
+      ],
+      "properties": {
+        "explore": {
+          "description": "The area or feature.",
+          "$ref": "#/$defs/short_text"
+        },
+        "with": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "roles",
+            "data",
+            "devices",
+            "interfaces"
+          ],
+          "properties": {
+            "roles": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "$ref": "#/$defs/short_text"
+              }
+            },
+            "data": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "$ref": "#/$defs/short_text"
+              }
+            },
+            "devices": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "$ref": "#/$defs/short_text"
+              }
+            },
+            "interfaces": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "$ref": "#/$defs/short_text"
+              }
+            }
+          }
+        },
+        "to_discover": {
+          "description": "The risks. An operator's to_discover line replaces the drafted one (S-QA-015).",
+          "$ref": "#/$defs/text"
+        },
+        "to_discover_source": {
+          "enum": [
+            "drafted",
+            "operator"
+          ]
+        },
+        "timebox_minutes": {
+          "description": "30 min (starting value, S-QA-033).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "build_digest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/build_digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "req_ids": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "pattern": "^REQ-[0-9]{3,}$",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "decision_summary": {
+      "description": "Required. The decisions the human has to make, first; prose follows (S-QA-019). Rendered first in the comment.",
+      "$ref": "#/$defs/text"
+    },
+    "session_notes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tried",
+        "skipped"
+      ],
+      "properties": {
+        "tried": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    },
+    "bug_drafts": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/bug_draft_traced"
+      }
+    },
+    "defect_items": {
+      "$ref": "#/$defs/defect_items"
+    },
+    "questions": {
+      "$ref": "#/$defs/questions"
+    },
+    "candidate_tests": {
+      "description": "Go to test-gen-<layer> once the human confirms their bug (S-QA-035).",
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "bug",
+          "layer",
+          "target",
+          "cites",
+          "steps",
+          "expected"
+        ],
+        "properties": {
+          "bug": {
+            "type": "string",
+            "pattern": "^B-[0-9]{3,}$",
+            "maxLength": 300
+          },
+          "layer": {
+            "enum": [
+              "unit",
+              "api",
+              "ui"
+            ]
+          },
+          "target": {
+            "$ref": "#/$defs/cited_id"
+          },
+          "cites": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/$defs/cited_id"
+            }
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/$defs/text"
+            }
+          },
+          "expected": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    },
+    "discovered": {
+      "description": "Discovered knowledge as full documents, never patches (S-QA-035, S-GEN-025). Candidate rules become rules only through knowledge drafting (S-BA-027).",
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "path",
+          "sections",
+          "evidence_refs"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "app_map",
+              "state_model",
+              "candidate_rule"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^knowledge/discovered/"
+              },
+              {
+                "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[^\\n\\r\\\\]{1,400}$"
+              }
+            ],
+            "maxLength": 400
+          },
+          "sections": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "heading",
+                "text"
+              ],
+              "properties": {
+                "heading": {
+                  "$ref": "#/$defs/short_text"
+                },
+                "text": {
+                  "$ref": "#/$defs/text"
+                }
+              }
+            }
+          },
+          "evidence_refs": {
+            "$ref": "#/$defs/evidence_refs"
+          }
+        }
+      }
+    },
+    "private_reports": {
+      "$ref": "#/$defs/private_reports"
+    },
+    "blocked": {
+      "$ref": "#/$defs/blocked"
+    },
+    "source_refs": {
+      "$ref": "#/$defs/source_refs"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "charter"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "session_notes": {
+            "properties": {
+              "tried": {
+                "maxItems": 0
+              },
+              "skipped": {
+                "maxItems": 0
+              }
+            }
+          },
+          "bug_drafts": {
+            "maxItems": 0
+          },
+          "candidate_tests": {
+            "maxItems": 0
+          },
+          "discovered": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "area": {
+      "description": "An area key from .staff/areas.yml (S-GEN-060).",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+      "maxLength": 300
+    },
+    "blocked": {
+      "description": "Set when the run fails closed: no test-map entry for the area and layer (S-QA-005), a missing prerequisite (S-QA-047), missing trace matrices (S-QA-040 citation status) or unusable input. The digest lists the gap. A blocked run proposes no files.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason",
+        "detail"
+      ],
+      "properties": {
+        "reason": {
+          "enum": [
+            "no_test_map_entry",
+            "missing_prerequisite",
+            "missing_trace_matrices",
+            "input_unusable"
+          ]
+        },
+        "detail": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "bug_draft_traced": {
+      "description": "Draft defect ticket (S-QA-011) with trace refs (S-QA-035).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "target",
+        "expected",
+        "actual",
+        "evidence_refs",
+        "repro",
+        "severity_guess",
+        "build_digest",
+        "run_id",
+        "trace_refs"
+      ],
+      "properties": {
+        "id": {
+          "description": "Run-local ID, so a candidate test can name its bug.",
+          "type": "string",
+          "pattern": "^B-[0-9]{3,}$",
+          "maxLength": 300
+        },
+        "target": {
+          "description": "An AC, R-ID, IF element or QAS.",
+          "type": "string",
+          "pattern": "^(REQ-[0-9]{3,}/AC-[0-9]{3,}|R-[0-9]{3,}|IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+#[A-Za-z0-9_.:/-]{1,200}|QAS-[0-9]{3,})$",
+          "maxLength": 300
+        },
+        "expected": {
+          "$ref": "#/$defs/text"
+        },
+        "actual": {
+          "$ref": "#/$defs/text"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/evidence_refs"
+        },
+        "repro": {
+          "description": "At most 20 steps (starting value, S-QA-011), each a bounded field (S-SEC-002).",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "severity_guess": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "build_digest": {
+          "$ref": "#/$defs/build_digest"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        },
+        "trace_refs": {
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "build_digest": {
+      "description": "The digest of the build the evidence comes from (S-TESTAB-003).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "cited_id": {
+      "description": "An ID a test may cite (S-QA-007, S-DEV-016): REQ-n/AC-m, REQ-n/AC-m/TC-k, R-n, IF-n@x.y.z#<element> or QAS-n.",
+      "type": "string",
+      "pattern": "^(REQ-[0-9]{3,}/AC-[0-9]{3,}(/TC-[0-9]{3,})?|R-[0-9]{3,}|IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+#[A-Za-z0-9_.:/-]{1,200}|QAS-[0-9]{3,})$",
+      "maxLength": 300
+    },
+    "defect_item": {
+      "description": "Requirement-defect item in the S-BA-048 form, posted on the requirement's ticket (S-QA-011). QA raises four kinds: two readings of an expected value -> ambiguous; an AC or test condition against an active rule -> contradicts; an outcome no stable identifier or seam exposes -> untestable; behaviour with no source -> missing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "kind",
+        "evidence_refs",
+        "text"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "pattern": "^REQ-[0-9]{3,}(/AC-[0-9]{3,})?$",
+          "maxLength": 300
+        },
+        "kind": {
+          "enum": [
+            "ambiguous",
+            "contradicts",
+            "untestable",
+            "missing"
+          ]
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/evidence_refs"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "defect_items": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/defect_item"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "key": {
+      "description": "What a question is about (S-BA-007, S-BA-014).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity",
+        "target_id",
+        "attribute"
+      ],
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/short_text"
+        },
+        "target_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "attribute": {
+          "$ref": "#/$defs/short_text"
+        }
+      }
+    },
+    "private_report": {
+      "description": "A suspected vulnerability or exposed secret, for a private report only (S-SEC-011, S-QA-011). Name the location, never the secret value (S-SEC-004).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "location",
+        "text"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "suspected_vulnerability",
+            "exposed_secret"
+          ]
+        },
+        "location": {
+          "$ref": "#/$defs/ref"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "private_reports": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/private_report"
+      }
+    },
+    "question": {
+      "description": "A question in the S-BA-014 form. Answers count only from operator accounts (S-QA-015).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "key",
+        "blocks",
+        "blocking",
+        "text",
+        "options",
+        "recommended",
+        "priority"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^Q-[0-9]{3,}$",
+          "maxLength": 300
+        },
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "blocks": {
+          "description": "What the question blocks: cited IDs, test IDs or file paths.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-d]$",
+                "maxLength": 300
+              },
+              "text": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "recommended": {
+          "type": "string",
+          "pattern": "^[a-d]$",
+          "maxLength": 300
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      }
+    },
+    "questions": {
+      "description": "At most 7, blocking first (S-BA-014).",
+      "type": "array",
+      "maxItems": 7,
+      "items": {
+        "$ref": "#/$defs/question"
+      }
+    },
+    "ref": {
+      "description": "A source or evidence ref: PR, comment, ticket, CI run or artifact, log or trace ref, file path with line, or a cited ID.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "refs": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "run_id": {
+      "description": "The run_id the harness gave this run (S-GEN-029).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites.",
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    }
+  }
+}

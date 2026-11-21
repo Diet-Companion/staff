@@ -1,0 +1,785 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-qa:ci-healer-output:1.0.0",
+  "title": "CI healer read-stage output",
+  "description": "Structured output of the ci-healer read stage (S-QA-032). One failing test per run. The harness injects the facts that decide rows x, a, b and e and rejects a row that contradicts them (S-QA-028). Free-text fields are quoted data, at most 2,000 characters each (S-SEC-002). Stage 1 writes only failure items and comments on them, requirement-defect items, classification comments on human PRs and the qa:* row labels on its own items.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "area",
+    "trigger",
+    "failure",
+    "decision_summary",
+    "defect_items",
+    "files",
+    "quarantine_entries",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "ci-healer"
+    },
+    "area": {
+      "$ref": "#/$defs/area"
+    },
+    "trigger": {
+      "description": "What started the run (S-QA-013).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "main_failure",
+            "scheduled_failure",
+            "expected_failure_pass",
+            "human_pr_failure",
+            "flake_sweep",
+            "failure_item_verdict",
+            "quarantine_extension",
+            "review_or_answer"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "failure": {
+      "description": "The classification of one failing test (S-QA-028, S-QA-032).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "test_id",
+        "facts_ref",
+        "row",
+        "label",
+        "cited_ids",
+        "declaring_ref",
+        "evidence_refs",
+        "route_to"
+      ],
+      "properties": {
+        "test_id": {
+          "$ref": "#/$defs/test_id"
+        },
+        "facts_ref": {
+          "description": "The injected facts the row is checked against.",
+          "$ref": "#/$defs/ref"
+        },
+        "row": {
+          "enum": [
+            "x",
+            "a",
+            "b",
+            "c",
+            "d",
+            "e"
+          ]
+        },
+        "label": {
+          "enum": [
+            "qa:fix-landed",
+            "qa:flaky",
+            "qa:test-update",
+            "qa:test-issue",
+            "qa:product-issue",
+            "qa:needs-human"
+          ]
+        },
+        "cited_ids": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/cited_id"
+          }
+        },
+        "declaring_ref": {
+          "description": "Row b: the changes[] entry, retirement or newer IF version that declares the change (S-QA-010).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/evidence_refs"
+        },
+        "route_to": {
+          "description": "Row b, or a verdict:rejected on a failure item (S-QA-031): the generator of the test's layer, or human for a characterization test. Otherwise null.",
+          "enum": [
+            "test-gen-unit",
+            "test-gen-api",
+            "test-gen-ui",
+            "human",
+            null
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "row": {
+                "const": "x"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "label": {
+                "const": "qa:fix-landed"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "row": {
+                "const": "a"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "label": {
+                "const": "qa:flaky"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "row": {
+                "const": "b"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "label": {
+                "const": "qa:test-update"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "row": {
+                "const": "c"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "label": {
+                "const": "qa:test-issue"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "row": {
+                "const": "d"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "label": {
+                "const": "qa:product-issue"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "row": {
+                "const": "e"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "label": {
+                "const": "qa:needs-human"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "row": {
+                "const": "b"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "declaring_ref": {
+                "$ref": "#/$defs/ref"
+              },
+              "route_to": {
+                "enum": [
+                  "test-gen-unit",
+                  "test-gen-api",
+                  "test-gen-ui",
+                  "human"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "failure_item": {
+      "description": "The failure item for a failure on main, in the S-QA-011 defect-ticket form (S-QA-031). target is the cited ID, or null for an uncited test. A repeat failure adds a comment to the open item.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "expected",
+        "actual",
+        "evidence_refs",
+        "repro",
+        "severity_guess",
+        "build_digest",
+        "run_id"
+      ],
+      "properties": {
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/cited_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected": {
+          "$ref": "#/$defs/text"
+        },
+        "actual": {
+          "$ref": "#/$defs/text"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/evidence_refs"
+        },
+        "repro": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        },
+        "severity_guess": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "build_digest": {
+          "$ref": "#/$defs/build_digest"
+        },
+        "run_id": {
+          "$ref": "#/$defs/run_id"
+        }
+      }
+    },
+    "decision_summary": {
+      "description": "Required. The decisions the human has to make, first; prose follows (S-QA-019). Rendered first in the comment.",
+      "$ref": "#/$defs/text"
+    },
+    "defect_items": {
+      "$ref": "#/$defs/defect_items"
+    },
+    "files": {
+      "description": "Rows c and x only, on main only (S-QA-030).",
+      "$ref": "#/$defs/files"
+    },
+    "quarantine_entries": {
+      "description": "Row a only: the qa/quarantine.yml entry for this test (S-QA-029). Each new entry is a flagged diff.",
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "test_id",
+          "evidence_refs",
+          "owner",
+          "since",
+          "expires",
+          "extension"
+        ],
+        "properties": {
+          "test_id": {
+            "$ref": "#/$defs/test_id"
+          },
+          "evidence_refs": {
+            "$ref": "#/$defs/evidence_refs"
+          },
+          "owner": {
+            "description": "The generating agent for agent-written tests, otherwise human.",
+            "enum": [
+              "test-gen-unit",
+              "test-gen-api",
+              "test-gen-ui",
+              "human"
+            ]
+          },
+          "since": {
+            "type": "string",
+            "format": "date",
+            "maxLength": 10
+          },
+          "expires": {
+            "description": "At most 14 days after since; the quarantine check enforces it.",
+            "type": "string",
+            "format": "date",
+            "maxLength": 10
+          },
+          "extension": {
+            "description": "Human-owned: set only from an operator comment with a written reason, once (S-QA-015).",
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "reason",
+                  "comment_ref",
+                  "expires"
+                ],
+                "properties": {
+                  "reason": {
+                    "$ref": "#/$defs/text"
+                  },
+                  "comment_ref": {
+                    "$ref": "#/$defs/ref"
+                  },
+                  "expires": {
+                    "type": "string",
+                    "format": "date",
+                    "maxLength": 10
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "blocked": {
+      "$ref": "#/$defs/blocked"
+    },
+    "source_refs": {
+      "$ref": "#/$defs/source_refs"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "failure": {
+            "properties": {
+              "row": {
+                "not": {
+                  "const": "b"
+                }
+              }
+            }
+          },
+          "trigger": {
+            "properties": {
+              "kind": {
+                "not": {
+                  "const": "failure_item_verdict"
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "failure": {
+            "properties": {
+              "route_to": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "failure": {
+            "properties": {
+              "row": {
+                "enum": [
+                  "a",
+                  "b",
+                  "d",
+                  "e"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "files": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "failure": {
+            "properties": {
+              "row": {
+                "const": "a"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "quarantine_entries": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "quarantine_entries": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "trigger": {
+            "properties": {
+              "kind": {
+                "const": "human_pr_failure"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "files": {
+            "maxItems": 0
+          },
+          "quarantine_entries": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "trigger": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "main_failure",
+                  "scheduled_failure"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "failure_item"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "blocked"
+        ]
+      },
+      "then": {
+        "properties": {
+          "files": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "area": {
+      "description": "An area key from .staff/areas.yml (S-GEN-060).",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+      "maxLength": 300
+    },
+    "blocked": {
+      "description": "Set when the run fails closed: no test-map entry for the area and layer (S-QA-005), a missing prerequisite (S-QA-047), missing trace matrices (S-QA-040 citation status) or unusable input. The digest lists the gap. A blocked run proposes no files.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason",
+        "detail"
+      ],
+      "properties": {
+        "reason": {
+          "enum": [
+            "no_test_map_entry",
+            "missing_prerequisite",
+            "missing_trace_matrices",
+            "input_unusable"
+          ]
+        },
+        "detail": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "build_digest": {
+      "description": "The digest of the build the evidence comes from (S-TESTAB-003).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "cited_id": {
+      "description": "An ID a test may cite (S-QA-007, S-DEV-016): REQ-n/AC-m, REQ-n/AC-m/TC-k, R-n, IF-n@x.y.z#<element> or QAS-n.",
+      "type": "string",
+      "pattern": "^(REQ-[0-9]{3,}/AC-[0-9]{3,}(/TC-[0-9]{3,})?|R-[0-9]{3,}|IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+#[A-Za-z0-9_.:/-]{1,200}|QAS-[0-9]{3,})$",
+      "maxLength": 300
+    },
+    "defect_item": {
+      "description": "Requirement-defect item in the S-BA-048 form, posted on the requirement's ticket (S-QA-011). QA raises four kinds: two readings of an expected value -> ambiguous; an AC or test condition against an active rule -> contradicts; an outcome no stable identifier or seam exposes -> untestable; behaviour with no source -> missing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "kind",
+        "evidence_refs",
+        "text"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "pattern": "^REQ-[0-9]{3,}(/AC-[0-9]{3,})?$",
+          "maxLength": 300
+        },
+        "kind": {
+          "enum": [
+            "ambiguous",
+            "contradicts",
+            "untestable",
+            "missing"
+          ]
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/evidence_refs"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "defect_items": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/defect_item"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "file": {
+      "description": "A proposed file in the S-DEV-021 files form. In the work sandbox the harness derives files[] from the workspace diff (S-QA-017); in this read-only build the read stage proposes them, and the write stage re-derives, checks (scope, parser, secret scan, no binary, size) and runs the QA checks before anything is posted. Full content travels as ordered chunks of at most 2,000 characters, never by reference.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "op"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "allOf": [
+            {
+              "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[^\\n\\r\\\\]{1,400}$"
+            },
+            {
+              "not": {
+                "pattern": "^(\\.staff|\\.github|requirements|architecture|knowledge)/|^AGENTS\\.md$"
+              }
+            }
+          ],
+          "maxLength": 400
+        },
+        "op": {
+          "enum": [
+            "add",
+            "modify",
+            "delete",
+            "rename"
+          ]
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[^\\n\\r\\\\]{1,400}$",
+          "maxLength": 400
+        },
+        "content": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "rename"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "from"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "add",
+                  "modify"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "content"
+            ],
+            "properties": {
+              "content": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "delete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "content": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "files": {
+      "description": "At most 20 proposed files per run (judgement call; a test PR changes at most 500 lines, S-QA-019).",
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "$ref": "#/$defs/file"
+      }
+    },
+    "ref": {
+      "description": "A source or evidence ref: PR, comment, ticket, CI run or artifact, log or trace ref, file path with line, or a cited ID.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "run_id": {
+      "description": "The run_id the harness gave this run (S-GEN-029).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites.",
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "test_id": {
+      "description": "Test ID v1, <path>::<name> as the layer's test_list prints it (S-QA-008, S-DEV-045).",
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 500,
+      "pattern": "^[^\\s:][^\\n]*::[^\\n]+$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    }
+  }
+}

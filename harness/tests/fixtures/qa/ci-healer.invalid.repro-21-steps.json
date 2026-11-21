@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "ci-healer",
+  "area": "orders",
+  "trigger": {
+    "kind": "main_failure",
+    "ref": "ci run 9001"
+  },
+  "failure": {
+    "test_id": "tests/ui/checkout.test.ext::customer cancels an order",
+    "facts_ref": "artifact facts-9001.json",
+    "row": "c",
+    "label": "qa:test-issue",
+    "cited_ids": [
+      "REQ-012/AC-004"
+    ],
+    "declaring_ref": null,
+    "evidence_refs": [
+      "ci run 9001 trace",
+      "reference run 8890"
+    ],
+    "route_to": null
+  },
+  "failure_item": {
+    "target": "R-031",
+    "expected": "error ORDER_SHIPPED",
+    "actual": "timeout waiting for locator",
+    "evidence_refs": [
+      "ci run 9001 log"
+    ],
+    "repro": [
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step",
+      "step"
+    ],
+    "severity_guess": "low",
+    "build_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "run_id": "run-qa-0001"
+  },
+  "decision_summary": "Row c: the cancel button's accessible name changed; asserted values match the reference run. Heal changes one locator.",
+  "defect_items": [],
+  "files": [
+    {
+      "path": "tests/ui/checkout.test.ext",
+      "op": "modify",
+      "content": [
+        "// cites: REQ-012/AC-004\n"
+      ]
+    }
+  ],
+  "quarantine_entries": [],
+  "source_refs": [
+    "ci run 9001",
+    "reference run 8890"
+  ]
+}

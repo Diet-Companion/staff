@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "ci-healer",
+  "area": "orders",
+  "trigger": {
+    "kind": "flake_sweep",
+    "ref": "nightly sweep 2026-11-20"
+  },
+  "failure": {
+    "test_id": "tests/ui/checkout.test.ext::customer cancels an order",
+    "facts_ref": "artifact facts-9001.json",
+    "row": "a",
+    "label": "qa:flaky",
+    "cited_ids": [
+      "REQ-012/AC-004"
+    ],
+    "declaring_ref": null,
+    "evidence_refs": [
+      "ci run 9001 trace",
+      "reference run 8890"
+    ],
+    "route_to": null
+  },
+  "decision_summary": "Row c: the cancel button's accessible name changed; asserted values match the reference run. Heal changes one locator.",
+  "defect_items": [],
+  "files": [],
+  "quarantine_entries": [
+    {
+      "test_id": "tests/ui/checkout.test.ext::customer cancels an order",
+      "evidence_refs": [
+        "sweep retry 2 passed"
+      ],
+      "owner": "test-gen-ui",
+      "since": "2026-11-20",
+      "expires": "2026-12-04",
+      "extension": null
+    }
+  ],
+  "source_refs": [
+    "ci run 9001",
+    "reference run 8890"
+  ]
+}

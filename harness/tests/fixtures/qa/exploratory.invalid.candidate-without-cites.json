@@ -1,0 +1,101 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "exploratory",
+  "area": "orders",
+  "trigger": {
+    "kind": "operator_qa_explore",
+    "ref": "ticket T-88 label event"
+  },
+  "mode": "session",
+  "ticket": "ticket T-88",
+  "charter": {
+    "explore": "order cancellation",
+    "with": {
+      "roles": [
+        "customer",
+        "support agent"
+      ],
+      "data": [
+        "shipped order"
+      ],
+      "devices": [
+        "narrow viewport"
+      ],
+      "interfaces": [
+        "IF-003@1.2.0"
+      ]
+    },
+    "to_discover": "cancellation after shipping, per-role permissions, double submit",
+    "to_discover_source": "drafted",
+    "timebox_minutes": 30,
+    "build_digest": null,
+    "req_ids": [
+      "REQ-012"
+    ]
+  },
+  "decision_summary": "Judge B-001 first: a shipped order could be cancelled, against R-031.",
+  "session_notes": {
+    "tried": [
+      "Cancel a shipped order as customer (trace run-qa-0002/3)."
+    ],
+    "skipped": [
+      "Narrow viewport: no UI captures in the session evidence."
+    ]
+  },
+  "bug_drafts": [
+    {
+      "id": "B-001",
+      "target": "R-031",
+      "expected": "error ORDER_SHIPPED",
+      "actual": "Order cancelled after shipping",
+      "evidence_refs": [
+        "ci run 9001 log"
+      ],
+      "repro": [
+        "Sign in as the synthetic customer test account.",
+        "Open a shipped order.",
+        "Select Cancel."
+      ],
+      "severity_guess": "high",
+      "build_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "run_id": "run-qa-0001",
+      "trace_refs": [
+        "trace run-qa-0002/3"
+      ]
+    }
+  ],
+  "defect_items": [],
+  "questions": [],
+  "candidate_tests": [
+    {
+      "bug": "B-001",
+      "layer": "api",
+      "target": "R-031",
+      "cites": [],
+      "steps": [
+        "Create a shipped order through the factory.",
+        "Call cancelOrder."
+      ],
+      "expected": "error ORDER_SHIPPED"
+    }
+  ],
+  "discovered": [
+    {
+      "kind": "state_model",
+      "path": "knowledge/discovered/orders/order-states.md",
+      "sections": [
+        {
+          "heading": "States",
+          "text": "placed, shipped, cancelled (observed)."
+        }
+      ],
+      "evidence_refs": [
+        "trace run-qa-0002/1"
+      ]
+    }
+  ],
+  "private_reports": [],
+  "source_refs": [
+    "requirements/orders/REQ-012.md"
+  ]
+}

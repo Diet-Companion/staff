@@ -1,0 +1,244 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "test-gen-unit",
+  "area": "orders",
+  "trigger": {
+    "kind": "dev_pr_intake",
+    "ref": "pr#41"
+  },
+  "pr": {
+    "kind": "tests",
+    "layer": "unit",
+    "product_pr": "pr#41",
+    "base": "agent/developer/req-012",
+    "feedback_round": 0,
+    "cited_ids": [
+      "R-031",
+      "REQ-012/AC-004"
+    ],
+    "characterization": [],
+    "expected_failures": [],
+    "survivor_categories": []
+  },
+  "decision_summary": "Cited: R-031, REQ-012/AC-004. No characterization tests, no expected failures. Kills 3 of 3 survivors from the gate run on pr#41.",
+  "files": [
+    {
+      "path": "src/orders/cancel.test.ext",
+      "op": "add",
+      "content": [
+        "// cites: R-031\ntest('cancel is refused after shipping', () => { /* ... */ })\n"
+      ]
+    }
+  ],
+  "suspected_issues": [],
+  "defect_items": [],
+  "bug_drafts": [],
+  "questions": [
+    {
+      "id": "Q-000",
+      "key": {
+        "entity": "order",
+        "target_id": "cancelOrder",
+        "attribute": "cancellation window"
+      },
+      "blocks": [
+        "REQ-012/AC-004"
+      ],
+      "blocking": true,
+      "text": "AC-004 and R-031 give different cancellation windows. Which one is the oracle?",
+      "options": [
+        {
+          "id": "a",
+          "text": "R-031: until shipped."
+        },
+        {
+          "id": "b",
+          "text": "AC-004: 24 hours."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    },
+    {
+      "id": "Q-001",
+      "key": {
+        "entity": "order",
+        "target_id": "cancelOrder",
+        "attribute": "cancellation window"
+      },
+      "blocks": [
+        "REQ-012/AC-004"
+      ],
+      "blocking": true,
+      "text": "AC-004 and R-031 give different cancellation windows. Which one is the oracle?",
+      "options": [
+        {
+          "id": "a",
+          "text": "R-031: until shipped."
+        },
+        {
+          "id": "b",
+          "text": "AC-004: 24 hours."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    },
+    {
+      "id": "Q-002",
+      "key": {
+        "entity": "order",
+        "target_id": "cancelOrder",
+        "attribute": "cancellation window"
+      },
+      "blocks": [
+        "REQ-012/AC-004"
+      ],
+      "blocking": true,
+      "text": "AC-004 and R-031 give different cancellation windows. Which one is the oracle?",
+      "options": [
+        {
+          "id": "a",
+          "text": "R-031: until shipped."
+        },
+        {
+          "id": "b",
+          "text": "AC-004: 24 hours."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    },
+    {
+      "id": "Q-003",
+      "key": {
+        "entity": "order",
+        "target_id": "cancelOrder",
+        "attribute": "cancellation window"
+      },
+      "blocks": [
+        "REQ-012/AC-004"
+      ],
+      "blocking": true,
+      "text": "AC-004 and R-031 give different cancellation windows. Which one is the oracle?",
+      "options": [
+        {
+          "id": "a",
+          "text": "R-031: until shipped."
+        },
+        {
+          "id": "b",
+          "text": "AC-004: 24 hours."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    },
+    {
+      "id": "Q-004",
+      "key": {
+        "entity": "order",
+        "target_id": "cancelOrder",
+        "attribute": "cancellation window"
+      },
+      "blocks": [
+        "REQ-012/AC-004"
+      ],
+      "blocking": true,
+      "text": "AC-004 and R-031 give different cancellation windows. Which one is the oracle?",
+      "options": [
+        {
+          "id": "a",
+          "text": "R-031: until shipped."
+        },
+        {
+          "id": "b",
+          "text": "AC-004: 24 hours."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    },
+    {
+      "id": "Q-005",
+      "key": {
+        "entity": "order",
+        "target_id": "cancelOrder",
+        "attribute": "cancellation window"
+      },
+      "blocks": [
+        "REQ-012/AC-004"
+      ],
+      "blocking": true,
+      "text": "AC-004 and R-031 give different cancellation windows. Which one is the oracle?",
+      "options": [
+        {
+          "id": "a",
+          "text": "R-031: until shipped."
+        },
+        {
+          "id": "b",
+          "text": "AC-004: 24 hours."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    },
+    {
+      "id": "Q-006",
+      "key": {
+        "entity": "order",
+        "target_id": "cancelOrder",
+        "attribute": "cancellation window"
+      },
+      "blocks": [
+        "REQ-012/AC-004"
+      ],
+      "blocking": true,
+      "text": "AC-004 and R-031 give different cancellation windows. Which one is the oracle?",
+      "options": [
+        {
+          "id": "a",
+          "text": "R-031: until shipped."
+        },
+        {
+          "id": "b",
+          "text": "AC-004: 24 hours."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    },
+    {
+      "id": "Q-007",
+      "key": {
+        "entity": "order",
+        "target_id": "cancelOrder",
+        "attribute": "cancellation window"
+      },
+      "blocks": [
+        "REQ-012/AC-004"
+      ],
+      "blocking": true,
+      "text": "AC-004 and R-031 give different cancellation windows. Which one is the oracle?",
+      "options": [
+        {
+          "id": "a",
+          "text": "R-031: until shipped."
+        },
+        {
+          "id": "b",
+          "text": "AC-004: 24 hours."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    }
+  ],
+  "private_reports": [],
+  "source_refs": [
+    "pr#41",
+    "knowledge/rules/orders/R-031.md",
+    "requirements/orders/REQ-012.md"
+  ]
+}

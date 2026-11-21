@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-qa:equivalence-filter-output:1.0.0",
+  "title": "Equivalence filter output",
+  "description": "Structured output of equivalence-filter (S-QA-038). It runs in the tokenless variant, holds no token and no write tool, so S-SEC-002's split doesn't apply; the gate reads this as a schema-validated artifact. unsure counts as not equivalent. If the output fails validation, every survivor counts as not equivalent. At most 50 calls: the gate runs at most 50 mutants (S-QA-036).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "decision_summary",
+    "calls",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "equivalence-filter"
+    },
+    "decision_summary": {
+      "description": "Required. Calls the human should check first, then a short account.",
+      "$ref": "#/$defs/text"
+    },
+    "calls": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mutant_id",
+          "verdict",
+          "reason"
+        ],
+        "properties": {
+          "mutant_id": {
+            "description": "The gate's ID for the survivor, tool or concern.",
+            "$ref": "#/$defs/short_text"
+          },
+          "verdict": {
+            "enum": [
+              "equivalent",
+              "not_equivalent",
+              "unsure"
+            ]
+          },
+          "reason": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    },
+    "source_refs": {
+      "$ref": "#/$defs/source_refs"
+    }
+  },
+  "$defs": {
+    "ref": {
+      "description": "A source or evidence ref: PR, comment, ticket, CI run or artifact, log or trace ref, file path with line, or a cited ID.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites.",
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    }
+  }
+}

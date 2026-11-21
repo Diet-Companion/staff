@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "equivalence-filter",
+  "calls": [
+    {
+      "mutant_id": "tool-4",
+      "verdict": "equivalent",
+      "reason": "Swaps two commutative additions; no input distinguishes them."
+    },
+    {
+      "mutant_id": "CM-001",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "tool-9",
+      "verdict": "unsure",
+      "reason": "Depends on clock behaviour not visible in the code read."
+    }
+  ],
+  "source_refs": [
+    "src/orders/cancel.ext"
+  ]
+}

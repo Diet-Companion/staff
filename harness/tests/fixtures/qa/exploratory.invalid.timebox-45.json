@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "exploratory",
+  "area": "orders",
+  "trigger": {
+    "kind": "req_implemented",
+    "ref": "nightly run 2026-11-20"
+  },
+  "mode": "charter",
+  "ticket": "ticket T-88",
+  "charter": {
+    "explore": "order cancellation",
+    "with": {
+      "roles": [
+        "customer",
+        "support agent"
+      ],
+      "data": [
+        "shipped order"
+      ],
+      "devices": [
+        "narrow viewport"
+      ],
+      "interfaces": [
+        "IF-003@1.2.0"
+      ]
+    },
+    "to_discover": "cancellation after shipping, per-role permissions, double submit",
+    "to_discover_source": "drafted",
+    "timebox_minutes": 45,
+    "build_digest": null,
+    "req_ids": [
+      "REQ-012"
+    ]
+  },
+  "decision_summary": "Charter for REQ-012. Start a session with qa:explore.",
+  "session_notes": {
+    "tried": [],
+    "skipped": []
+  },
+  "bug_drafts": [],
+  "defect_items": [],
+  "questions": [],
+  "candidate_tests": [],
+  "discovered": [],
+  "private_reports": [],
+  "source_refs": [
+    "requirements/orders/REQ-012.md"
+  ]
+}

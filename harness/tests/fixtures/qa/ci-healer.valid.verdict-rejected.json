@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "ci-healer",
+  "area": "orders",
+  "trigger": {
+    "kind": "failure_item_verdict",
+    "ref": "item 77 verdict:rejected"
+  },
+  "failure": {
+    "test_id": "tests/ui/checkout.test.ext::customer cancels an order",
+    "facts_ref": "artifact facts-9001.json",
+    "row": "d",
+    "label": "qa:product-issue",
+    "cited_ids": [
+      "REQ-012/AC-004"
+    ],
+    "declaring_ref": null,
+    "evidence_refs": [
+      "ci run 9001 trace",
+      "reference run 8890"
+    ],
+    "route_to": "test-gen-ui"
+  },
+  "decision_summary": "Row c: the cancel button's accessible name changed; asserted values match the reference run. Heal changes one locator.",
+  "defect_items": [],
+  "files": [],
+  "quarantine_entries": [],
+  "source_refs": [
+    "ci run 9001",
+    "reference run 8890"
+  ]
+}

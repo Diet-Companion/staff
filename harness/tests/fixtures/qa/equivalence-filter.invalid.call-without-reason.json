@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "equivalence-filter",
+  "decision_summary": "Equivalent, needs sign-off: tool-4. Counts: 1 equivalent, 1 not equivalent, 1 unsure.",
+  "calls": [
+    {
+      "mutant_id": "tool-4",
+      "verdict": "equivalent"
+    },
+    {
+      "mutant_id": "CM-001",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "tool-9",
+      "verdict": "unsure",
+      "reason": "Depends on clock behaviour not visible in the code read."
+    }
+  ],
+  "source_refs": [
+    "src/orders/cancel.ext"
+  ]
+}

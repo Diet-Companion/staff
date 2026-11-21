@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "test-gen-ui",
+  "area": "orders",
+  "trigger": {
+    "kind": "nightly_gap",
+    "ref": "nightly run 2026-11-20"
+  },
+  "pr": {
+    "kind": "tests",
+    "layer": "ui",
+    "product_pr": null,
+    "base": "main",
+    "feedback_round": 0,
+    "cited_ids": [],
+    "characterization": [],
+    "expected_failures": [],
+    "survivor_categories": []
+  },
+  "decision_summary": "Blocked: .staff/tests.yml has no ui entry for orders. Add one to enable UI generation.",
+  "files": [],
+  "suspected_issues": [],
+  "defect_items": [],
+  "bug_drafts": [],
+  "questions": [],
+  "private_reports": [],
+  "source_refs": [
+    "pr#41",
+    "knowledge/rules/orders/R-031.md",
+    "requirements/orders/REQ-012.md"
+  ],
+  "blocked": {
+    "reason": "no_test_map_entry",
+    "detail": "No ui entry for area orders in .staff/tests.yml."
+  }
+}

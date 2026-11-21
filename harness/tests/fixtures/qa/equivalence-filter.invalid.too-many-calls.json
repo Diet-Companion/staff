@@ -1,0 +1,265 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "equivalence-filter",
+  "decision_summary": "Equivalent, needs sign-off: tool-4. Counts: 1 equivalent, 1 not equivalent, 1 unsure.",
+  "calls": [
+    {
+      "mutant_id": "m-0",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-1",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-2",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-3",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-4",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-5",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-6",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-7",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-8",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-9",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-10",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-11",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-12",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-13",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-14",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-15",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-16",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-17",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-18",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-19",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-20",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-21",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-22",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-23",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-24",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-25",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-26",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-27",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-28",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-29",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-30",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-31",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-32",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-33",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-34",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-35",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-36",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-37",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-38",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-39",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-40",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-41",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-42",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-43",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-44",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-45",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-46",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-47",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-48",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-49",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    },
+    {
+      "mutant_id": "m-50",
+      "verdict": "not_equivalent",
+      "reason": "A shipped order is cancelled instead of refused."
+    }
+  ],
+  "source_refs": [
+    "src/orders/cancel.ext"
+  ]
+}

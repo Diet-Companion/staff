@@ -1,0 +1,6 @@
+{
+  "name": "staff-qa",
+  "version": "0.1.0",
+  "description": "Test engineer agents. Lean slice: the test generators (unit, API, UI), ci-healer, exploratory, mutant-drafter and equivalence-filter at stage 1 in read-stage form, with the qa-core, test-generation, healing, exploratory and mutation skills and one read-stage schema per agent (one shared by the three generators).",
+  "dependencies": ["staff-core"]
+}

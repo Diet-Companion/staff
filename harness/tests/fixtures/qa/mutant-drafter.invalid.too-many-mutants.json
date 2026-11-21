@@ -1,0 +1,296 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "mutant-drafter",
+  "decision_summary": "Concerns covered: R-031 (2 mutants). No test files were opened.",
+  "mutants": [
+    {
+      "mutant_id": "CM-000",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-001",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-002",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-003",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-004",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-005",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-006",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-007",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-008",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-009",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-010",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-011",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-012",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-013",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-014",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-015",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-016",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-017",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-018",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-019",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-020",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-021",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-022",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-023",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-024",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    },
+    {
+      "mutant_id": "CM-025",
+      "concern": {
+        "kind": "rule",
+        "ref": "R-031"
+      },
+      "cited_id": "R-031",
+      "form": "code_patch",
+      "patch": "--- a/src/orders/cancel.ext\n+++ b/src/orders/cancel.ext\n@@ -40 +40 @@\n-if (order.shipped) refuse()\n+if (false) refuse()\n",
+      "rationale": "Drops the shipped check that R-031 requires."
+    }
+  ],
+  "source_refs": [
+    "knowledge/rules/orders/R-031.md"
+  ]
+}

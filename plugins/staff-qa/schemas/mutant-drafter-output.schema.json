@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-qa:mutant-drafter-output:1.0.0",
+  "title": "Mutant drafter output",
+  "description": "Structured output of mutant-drafter (S-QA-039). It runs in the tokenless variant, holds no token and no write tool, so S-SEC-002's split doesn't apply; the gate reads this as a schema-validated artifact and validates each mutant by script. At most 5 concerns per gate run and 3-5 mutants per concern, so at most 25 mutants.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "decision_summary",
+    "mutants",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "mutant-drafter"
+    },
+    "decision_summary": {
+      "description": "Required. Concerns covered and skipped, and anything the human should look at first.",
+      "$ref": "#/$defs/text"
+    },
+    "mutants": {
+      "type": "array",
+      "maxItems": 25,
+      "items": {
+        "$ref": "#/$defs/mutant"
+      }
+    },
+    "source_refs": {
+      "$ref": "#/$defs/source_refs"
+    }
+  },
+  "$defs": {
+    "cited_id": {
+      "description": "An ID a test may cite (S-QA-007, S-DEV-016): REQ-n/AC-m, REQ-n/AC-m/TC-k, R-n, IF-n@x.y.z#<element> or QAS-n.",
+      "type": "string",
+      "pattern": "^(REQ-[0-9]{3,}/AC-[0-9]{3,}(/TC-[0-9]{3,})?|R-[0-9]{3,}|IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+#[A-Za-z0-9_.:/-]{1,200}|QAS-[0-9]{3,})$",
+      "maxLength": 300
+    },
+    "mutant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mutant_id",
+        "concern",
+        "cited_id",
+        "form",
+        "rationale"
+      ],
+      "properties": {
+        "mutant_id": {
+          "type": "string",
+          "pattern": "^CM-[0-9]{3,}$",
+          "maxLength": 300
+        },
+        "concern": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "ref"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "rule",
+                "ac",
+                "test_condition",
+                "domain_clause",
+                "review_finding",
+                "past_fix"
+              ]
+            },
+            "ref": {
+              "$ref": "#/$defs/ref"
+            }
+          }
+        },
+        "cited_id": {
+          "description": "The ID a killing test cites (trace, S-QA-039), or null when the concern has none.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/cited_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "form": {
+          "enum": [
+            "code_patch",
+            "response_mutation"
+          ]
+        },
+        "patch": {
+          "description": "A unified diff against the product PR's changed modules, source lines only, at most 2,000 characters (S-QA-039).",
+          "$ref": "#/$defs/text"
+        },
+        "mutation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operation",
+            "field",
+            "kind",
+            "change"
+          ],
+          "properties": {
+            "operation": {
+              "description": "An operation the new tests call, as IF-n@x.y.z#<operation>.",
+              "type": "string",
+              "pattern": "^IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+#[A-Za-z0-9_.:/-]{1,200}$",
+              "maxLength": 300
+            },
+            "field": {
+              "description": "A field of the operation's approved spec.",
+              "$ref": "#/$defs/short_text"
+            },
+            "kind": {
+              "enum": [
+                "value",
+                "structure",
+                "error_payload",
+                "partial_data",
+                "status",
+                "latency"
+              ]
+            },
+            "change": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        },
+        "rationale": {
+          "$ref": "#/$defs/text"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "form": {
+                "const": "code_patch"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "patch"
+            ],
+            "not": {
+              "required": [
+                "mutation"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "form": {
+                "const": "response_mutation"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "mutation"
+            ],
+            "not": {
+              "required": [
+                "patch"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ref": {
+      "description": "A source or evidence ref: PR, comment, ticket, CI run or artifact, log or trace ref, file path with line, or a cited ID.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites.",
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    }
+  }
+}
