@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "devops",
+  "trigger": {
+    "kind": "arch_change",
+    "ref": "example/shop@main",
+    "fixup_round": 0
+  },
+  "outcome": "returned",
+  "decision_summary": "Decide first: design request on QAS-007 (measure not observable). One private report filed. No draft.",
+  "design_requests": [],
+  "defect_items": [],
+  "questions": [],
+  "assumptions": [],
+  "private_reports": [],
+  "source_refs": [
+    "architecture/web/quality/QAS-007.md"
+  ]
+}
