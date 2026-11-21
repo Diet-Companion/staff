@@ -1,0 +1,605 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-product:analyst-output:1.0.0",
+  "title": "Analyst read-stage output",
+  "description": "Structured output of the BA Analyst read stage (S-BA-037). The staff-core harness validates it and rejects any action outside the allowed set (S-SEC-002, S-SEC-003). Free-text fields are quoted data, at most 2,000 characters each (S-SEC-002). Requirement and AC fields follow S-BA-006 and S-BA-007; IDs follow S-BA-005.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "intake",
+    "outcome",
+    "decision_summary",
+    "requirements",
+    "questions",
+    "assumptions",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "analyst"
+    },
+    "intake": {
+      "description": "The intake this run worked on (S-BA-013).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "area", "batch_number", "is_kickoff"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "area": { "$ref": "#/$defs/area" },
+        "batch_number": {
+          "description": "Which question batch on this intake this run produces or follows, starting at 1. Escalate instead of asking when blocking questions are still open after batch 3 (S-BA-016).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "is_kickoff": {
+          "description": "True when the area has no ready requirement, no merged INT-n and no other open kickoff intake (S-BA-013).",
+          "type": "boolean"
+        }
+      }
+    },
+    "outcome": {
+      "description": "What the write stage should post. questions: a question batch only. drafts: draft requirements only. drafts_and_questions: both. interview_guide: kickoff guide instead of a batch (S-BA-013, S-BA-055). escalation: blocking questions still open after 3 batches (S-BA-016).",
+      "enum": ["questions", "drafts", "drafts_and_questions", "interview_guide", "escalation"]
+    },
+    "ready_gate": {
+      "description": "True only for a ready-gate PR (stage 2, S-BA-018). Then the requirements may exceed 5 but must be one epic and its stories (S-BA-037, S-BA-049). Always false at stage 1.",
+      "type": "boolean",
+      "default": false
+    },
+    "decision_summary": {
+      "description": "Required. The decisions the human has to make, first; prose follows (S-BA-037, S-BA-049). Rendered first in the comment or PR body.",
+      "$ref": "#/$defs/text"
+    },
+    "requirements": {
+      "description": "Draft requirements (S-BA-006). At most 5 per run, or one epic with its stories for a ready-gate PR (S-BA-037).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/requirement" }
+    },
+    "test_conditions": {
+      "description": "Test conditions v1 (S-BA-048, S-BA-050). Only after a ready-gate merge.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/test_condition" }
+    },
+    "questions": {
+      "description": "The question batch: at most 7, blocking first, then by how many ACs each affects (S-BA-014).",
+      "type": "array",
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/question" }
+    },
+    "assumptions": {
+      "description": "Assumptions recorded in this run, including overflow questions beyond the batch limit (S-BA-012, S-BA-014).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/run_assumption" }
+    },
+    "answers_applied": {
+      "description": "Human-owned fields set in this run, each citing an operator comment or a human interview turn (S-BA-015).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "field", "comment_ref"],
+        "properties": {
+          "target": { "$ref": "#/$defs/any_req_id" },
+          "field": {
+            "description": "Path of the field inside the target, for example priority or assumptions[A-002].status.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "comment_ref": { "$ref": "#/$defs/ref" }
+        }
+      }
+    },
+    "interview_guide": {
+      "description": "Kickoff interview guide: at most 10 topics, blocking first (S-BA-055).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topics"],
+      "properties": {
+        "topics": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["topic_id", "category", "text", "blocking"],
+            "properties": {
+              "topic_id": { "type": "string", "pattern": "^T-[0-9]{2,}$" },
+              "category": {
+                "enum": ["actors", "goals", "journeys", "rules", "permissions", "quality_targets", "out_of_scope"]
+              },
+              "text": { "$ref": "#/$defs/text" },
+              "blocking": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "escalation": {
+      "description": "Posted instead of a fourth batch (S-BA-016). Silence never decides a business question.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "open_blocking_questions"],
+      "properties": {
+        "reason": { "$ref": "#/$defs/text" },
+        "open_blocking_questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/question_id" }
+        }
+      }
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites (S-BA-012).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/ref" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "ready_gate": { "const": true } },
+        "required": ["ready_gate"]
+      },
+      "then": {
+        "properties": {
+          "requirements": {
+            "minItems": 1,
+            "contains": { "properties": { "type": { "const": "epic" } }, "required": ["type"] },
+            "minContains": 1,
+            "maxContains": 1
+          }
+        }
+      },
+      "else": {
+        "properties": { "requirements": { "maxItems": 5 } }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "enum": ["questions", "drafts_and_questions"] } } },
+      "then": { "properties": { "questions": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "enum": ["drafts", "drafts_and_questions"] } } },
+      "then": { "properties": { "requirements": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "interview_guide" } } },
+      "then": { "required": ["interview_guide"] }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "escalation" } } },
+      "then": { "required": ["escalation"], "properties": { "questions": { "maxItems": 0 } } }
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "ref": {
+      "description": "A source ref: ticket, comment, interview turn (INT-n#T<k> or INT-n#T<k>/T<k+1>), R-ID, REQ or AC ID, or doc path.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "area": {
+      "description": "An area key from .staff/areas.yml (S-GEN-060).",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+    },
+    "req_id": { "type": "string", "pattern": "^REQ-[0-9]{3,}$" },
+    "ac_id": { "type": "string", "pattern": "^REQ-[0-9]{3,}/AC-[0-9]{3,}$" },
+    "tc_id": { "type": "string", "pattern": "^REQ-[0-9]{3,}/AC-[0-9]{3,}/TC-[0-9]{3,}$" },
+    "rule_id": { "type": "string", "pattern": "^R-[0-9]{3,}$" },
+    "any_req_id": { "type": "string", "pattern": "^REQ-[0-9]{3,}(/AC-[0-9]{3,})?$" },
+    "question_id": { "type": "string", "pattern": "^Q-[0-9]{3,}$" },
+    "assumption_id": { "type": "string", "pattern": "^A-[0-9]{3,}$" },
+    "cites": {
+      "description": "Source refs, R-IDs or assumption IDs. A statement with no source cites an open assumption (S-BA-012).",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/ref" }
+    },
+    "key": {
+      "description": "What an AC, question or assumption is about (S-BA-007). Names come from the product-core glossary, the interface specs or the requirement's terms.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "target_id", "attribute"],
+      "properties": {
+        "entity": { "$ref": "#/$defs/short_text" },
+        "target_id": {
+          "description": "Stable identifier of the operation, error, event or UI element (S-TESTAB-005), or null.",
+          "type": ["string", "null"],
+          "maxLength": 200
+        },
+        "attribute": { "$ref": "#/$defs/short_text" }
+      }
+    },
+    "none_with_reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["none"],
+      "properties": {
+        "none": { "$ref": "#/$defs/text" }
+      }
+    },
+    "cited_text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "cites"],
+      "properties": {
+        "text": { "$ref": "#/$defs/text" },
+        "cites": { "$ref": "#/$defs/cites" }
+      }
+    },
+    "acceptance_criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "given", "when", "then", "cites", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/ac_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "given": {
+          "description": "Preconditions, including data and the user role.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/text" }
+        },
+        "when": {
+          "description": "Exactly one trigger.",
+          "$ref": "#/$defs/text"
+        },
+        "then": {
+          "description": "Observable outcomes with expected values.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/text" }
+        },
+        "cites": { "$ref": "#/$defs/cites" },
+        "kind": { "enum": ["positive", "negative", "boundary"] },
+        "status": {
+          "description": "retired when its meaning changed (S-BA-010).",
+          "enum": ["active", "retired"],
+          "default": "active"
+        }
+      }
+    },
+    "requirement_question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "status", "blocking"],
+      "properties": {
+        "id": { "$ref": "#/$defs/question_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "status": {
+          "description": "answered is human-owned (S-BA-015).",
+          "enum": ["open", "answered"]
+        },
+        "blocking": { "type": "boolean" },
+        "answer_ref": { "$ref": "#/$defs/ref" }
+      }
+    },
+    "requirement_assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "text", "status", "blocking"],
+      "properties": {
+        "id": { "$ref": "#/$defs/assumption_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "text": { "$ref": "#/$defs/text" },
+        "status": {
+          "description": "confirmed and rejected are human-owned (S-BA-015).",
+          "enum": ["open", "confirmed", "rejected"]
+        },
+        "blocking": { "type": "boolean" },
+        "answer_ref": { "$ref": "#/$defs/ref" }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "type", "title", "status", "area", "intent", "scope",
+        "acceptance_criteria", "rules", "changes", "quality", "permissions",
+        "sources", "assumptions", "questions", "priority", "tracker", "revision"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/req_id" },
+        "type": { "enum": ["epic", "story", "quality"] },
+        "title": { "$ref": "#/$defs/short_text" },
+        "status": {
+          "description": "Agents draft. Only a human-merged ready-gate PR makes a requirement ready (S-BA-009, S-BA-018).",
+          "enum": ["draft", "ready", "changed", "retired"]
+        },
+        "area": { "$ref": "#/$defs/area" },
+        "parent": {
+          "description": "For stories, the epic's REQ ID.",
+          "anyOf": [{ "$ref": "#/$defs/req_id" }, { "type": "null" }]
+        },
+        "intent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["actor", "need", "business_value", "cites"],
+          "properties": {
+            "actor": { "$ref": "#/$defs/text" },
+            "need": { "$ref": "#/$defs/text" },
+            "business_value": { "$ref": "#/$defs/text" },
+            "cites": { "$ref": "#/$defs/cites" }
+          }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["in", "out"],
+          "properties": {
+            "in": { "type": "array", "items": { "$ref": "#/$defs/cited_text" } },
+            "out": { "type": "array", "items": { "$ref": "#/$defs/cited_text" } }
+          }
+        },
+        "acceptance_criteria": {
+          "description": "Epics may have none (S-BA-006).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/acceptance_criterion" }
+        },
+        "rules": {
+          "description": "R-IDs of merged active rules the requirement relies on (S-BA-022).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/rule_id" }
+        },
+        "changes": {
+          "description": "Rule-change declarations (S-BA-006).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rule", "kind", "proposed_statement", "accepted_by"],
+            "properties": {
+              "rule": {
+                "anyOf": [{ "$ref": "#/$defs/rule_id" }, { "const": "new" }]
+              },
+              "kind": { "enum": ["add", "modify", "retire"] },
+              "proposed_statement": { "$ref": "#/$defs/text" },
+              "accepted_by": {
+                "description": "Human-owned: the ref of the human's accepting comment, or empty (S-BA-015).",
+                "type": "string",
+                "maxLength": 500
+              }
+            }
+          }
+        },
+        "review_dispositions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["finding_id", "disposition", "ref"],
+            "properties": {
+              "finding_id": { "$ref": "#/$defs/short_text" },
+              "disposition": {
+                "description": "accepted and rejected are human-owned and cite a human comment (S-BA-015).",
+                "enum": ["declared", "accepted", "rejected"]
+              },
+              "ref": { "$ref": "#/$defs/ref" }
+            }
+          }
+        },
+        "review_waiver": {
+          "description": "Human-owned (S-BA-015).",
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ref", "revision"],
+              "properties": {
+                "ref": { "$ref": "#/$defs/ref" },
+                "revision": { "$ref": "#/$defs/short_text" }
+              }
+            }
+          ]
+        },
+        "terms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["term", "definition", "cites"],
+            "properties": {
+              "term": { "$ref": "#/$defs/short_text" },
+              "definition": { "$ref": "#/$defs/text" },
+              "cites": { "$ref": "#/$defs/cites" }
+            }
+          }
+        },
+        "quality": {
+          "description": "Linked quality REQ IDs, or none with a reason.",
+          "anyOf": [
+            { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/req_id" } },
+            { "$ref": "#/$defs/none_with_reason" }
+          ]
+        },
+        "permissions": {
+          "description": "Product user roles affected, with what each may and may not do, or none with a reason.",
+          "anyOf": [
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["role", "may", "may_not"],
+                "properties": {
+                  "role": { "$ref": "#/$defs/short_text" },
+                  "may": { "type": "array", "items": { "$ref": "#/$defs/text" } },
+                  "may_not": { "type": "array", "items": { "$ref": "#/$defs/text" } }
+                }
+              }
+            },
+            { "$ref": "#/$defs/none_with_reason" }
+          ]
+        },
+        "sources": {
+          "description": "A ref for every statement (S-BA-012).",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/requirement_assumption" }
+        },
+        "questions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/requirement_question" }
+        },
+        "priority": {
+          "description": "Human-owned. null unless an operator answer set it (S-BA-015).",
+          "type": ["string", "null"],
+          "maxLength": 50
+        },
+        "tracker": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "revision": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["date", "change", "reason", "source_ref"],
+            "properties": {
+              "date": { "type": "string", "format": "date" },
+              "change": { "$ref": "#/$defs/text" },
+              "reason": { "$ref": "#/$defs/text" },
+              "source_ref": { "$ref": "#/$defs/ref" },
+              "affected_acs": {
+                "description": "For ready → changed: the affected ACs (S-BA-009).",
+                "type": "array",
+                "items": { "$ref": "#/$defs/ac_id" }
+              },
+              "defect": {
+                "description": "Set when the change repairs a human-confirmed requirement defect (S-BA-048).",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["item_ref", "kind"],
+                "properties": {
+                  "item_ref": { "$ref": "#/$defs/ref" },
+                  "kind": { "enum": ["ambiguous", "contradicts", "untestable", "missing", "infeasible"] }
+                }
+              }
+            }
+          }
+        },
+        "retired": {
+          "description": "Set only when status is retired (S-BA-009).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reason", "replaced_by"],
+          "properties": {
+            "reason": { "$ref": "#/$defs/text" },
+            "replaced_by": {
+              "anyOf": [{ "$ref": "#/$defs/req_id" }, { "type": "null" }]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "story" } } },
+          "then": { "required": ["parent"], "properties": { "parent": { "$ref": "#/$defs/req_id" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "retired" } } },
+          "then": { "required": ["retired"] }
+        }
+      ]
+    },
+    "test_condition": {
+      "description": "Test conditions v1 (S-BA-048).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ac", "kind", "given", "when", "then", "cites"],
+      "properties": {
+        "id": { "$ref": "#/$defs/tc_id" },
+        "ac": { "$ref": "#/$defs/ac_id" },
+        "kind": { "enum": ["positive", "negative", "boundary"] },
+        "given": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/text" } },
+        "when": { "$ref": "#/$defs/text" },
+        "then": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/text" } },
+        "cites": { "$ref": "#/$defs/cites" }
+      }
+    },
+    "question": {
+      "description": "One question in a batch (S-BA-014, S-BA-037).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "blocks", "blocking", "text", "options", "recommended", "priority"],
+      "properties": {
+        "id": { "$ref": "#/$defs/question_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "blocks": {
+          "description": "The REQ or AC IDs this question blocks.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/any_req_id" }
+        },
+        "blocking": {
+          "description": "True when it blocks the ready gate. Blocking questions come first.",
+          "type": "boolean"
+        },
+        "text": { "$ref": "#/$defs/text" },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "text"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-d]$" },
+              "text": { "$ref": "#/$defs/text" }
+            }
+          }
+        },
+        "recommended": {
+          "description": "The id of the recommended option. Shown to the human; never applied without an answer (S-BA-015, S-BA-016).",
+          "type": "string",
+          "pattern": "^[a-d]$"
+        },
+        "priority": {
+          "description": "Position in the batch, 1 first.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      }
+    },
+    "run_assumption": {
+      "description": "An assumption raised in this run (S-BA-037).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "text", "blocking"],
+      "properties": {
+        "id": { "$ref": "#/$defs/assumption_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "text": { "$ref": "#/$defs/text" },
+        "blocking": { "type": "boolean" }
+      }
+    }
+  }
+}
