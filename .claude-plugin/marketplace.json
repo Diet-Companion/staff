@@ -16,6 +16,12 @@
       "source": "./plugins/staff-product",
       "description": "Business-analyst agents. Lean slice: the Analyst read stage at stage 1.",
       "version": "0.1.0"
+    },
+    {
+      "name": "staff-qa",
+      "source": "./plugins/staff-qa",
+      "description": "Test engineer agents: test generators per layer, CI healer, exploratory, mutation drafter and equivalence filter. Built; not wired to any workflow yet.",
+      "version": "0.1.0"
     }
   ]
 }
