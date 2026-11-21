@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "reviewer",
+  "artifact_type": "tests",
+  "target": {
+    "kind": "pull_request",
+    "ref": "pr#70"
+  },
+  "reviewed_sha": null,
+  "verdict": "ready",
+  "decision_summary": "No decisions needed. Every cited value matches its source (TR-1). One readability note.",
+  "findings": [
+    {
+      "finding_id": "TR-9|tests/api/orders/cancel.spec.ts::rejects dispatched order|REQ-012/AC-003",
+      "checklist_id": "TR-9",
+      "severity": "minor",
+      "location": "tests/api/orders/cancel.spec.ts:L12",
+      "text": "The test name does not say which rule condition it covers.",
+      "suggestion": "Name it after the condition: rejects cancellation of a dispatched order.",
+      "cited_ids": [
+        "REQ-012/AC-003"
+      ],
+      "evidence_refs": [
+        "tests/api/orders/cancel.spec.ts:L12"
+      ],
+      "classification": "issue"
+    }
+  ],
+  "questions": [],
+  "source_refs": [
+    "pr#70",
+    "requirements/orders/REQ-012.md"
+  ]
+}
