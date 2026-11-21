@@ -22,8 +22,10 @@ REASONS = {
     "model_error", "no_output", "output_not_json", "schema_invalid",
     "multiple_epics", "parent_mismatch", "blocking_order", "duplicate_id",
     "ac_id_mismatch", "recommended_not_option", "unknown_area", "stage_violation",
-    # redaction of the output (redact_check.py)
+    # redaction of the output (redact_check.py, check_transcript.py)
     "redaction_hit",
+    # interview transcripts (check_transcript.py)
+    "transcript_invalid",
     # write stage and bookkeeping
     "record_failed", "read_job_failed", "artifact_missing", "render_failed", "render_too_large",
 }

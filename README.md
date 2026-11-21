@@ -13,7 +13,7 @@ Only one agent runs: the business-analyst **Analyst**, at **stage 1 (advisory)**
 - It reads an intake ticket and the product repo with read-only tools (`Read`, `Glob`, `Grep`).
 - It returns JSON only, validated against [`analyst-output.schema.json`](plugins/staff-product/schemas/analyst-output.schema.json): a question batch, up to 5 draft requirements with acceptance criteria, a kickoff interview guide, or an escalation.
 - A separate write step posts that output as comments on the ticket. The Analyst never commits, opens PRs, labels or merges.
-- Everything else is manual: the human starts runs, gives verdicts, writes rules and the product core, commits accepted drafts, and runs any interview.
+- Everything else is manual: the human starts runs, gives verdicts, writes rules and the product core, commits accepted drafts, and runs any interview (see [`docs/interview-kickoff.md`](docs/interview-kickoff.md)).
 
 [`governance/guardrails.md`](governance/guardrails.md) shows which guardrail enforcement exists in the lean slice and which comes later.
 
@@ -29,8 +29,11 @@ staff/
     staff-product/                     # business analyst
       .claude-plugin/plugin.json
       agents/analyst.md                # Analyst read stage (stage 1)
+      agents/analyst-interview.md      # tool-less live kickoff interviewer, human-launched (S-BA-055)
       skills/requirements/SKILL.md     # requirement, AC and rule model, IDs, paths
       skills/elicitation/SKILL.md      # question batches, stage-1 output
+      skills/analyst-interview/SKILL.md  # interviewer rules, INT-n format (S-BA-055 to S-BA-057)
+      templates/INT-n.md               # interview transcript template (S-BA-056)
       schemas/analyst-output.schema.json
   harness/                             # read/write-stage harness for headless runs (Python 3.12)
     build_input.py                     # issue + operator comments -> untrusted input file
@@ -40,11 +43,13 @@ staff/
     render_comment.py                  # deterministic Markdown comments
     run_record.py                      # run record (S-GEN-029)
     contract.py                        # operators.yml, areas.yml, product.yml readers
+    check_transcript.py                # INT-n transcript lint, run by the human before commit
     tests/                             # unittest; run by .github/workflows/harness-tests.yml
   governance/
     guardrails.md                      # G1-G12 and how each is enforced
     product-contract.md                # what a product repo must contain
     operators.yml                      # the human's accounts, for actor checks
+  docs/interview-kickoff.md            # operator how-to: run a kickoff interview, commit INT-n
   docs/strategy/                       # copy of the approved strategy and decisions log
   CODEOWNERS                           # the human owns every path
 ```
