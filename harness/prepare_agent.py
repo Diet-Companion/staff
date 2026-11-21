@@ -8,8 +8,11 @@ agent body and its preloaded skills into one prompt file, passed with
 `--append-system-prompt-file`, and restricts tools with `--tools`.
 
 The CLI validates `--json-schema` as draft-07 in strict mode, so the CLI copy of
-the schema drops `$schema`, `minContains` and `maxContains`. That only loosens the
-ready-gate branch, which validate_output.py still checks with the full schema.
+the schema drops `$schema`, `minContains` and `maxContains`. The API also rejects
+`allOf`, `anyOf`, `oneOf` (and so `if`/`then`/`else`) at the top level of a tool's
+input schema, so the CLI copy drops those there; nested ones stay. That only
+loosens the cross-field rules (ready gate, outcome-dependent fields), which
+validate_output.py still checks with the full schema.
 """
 import argparse
 import os
@@ -19,6 +22,7 @@ from common import HarnessError, load_json, run_main, write_json
 
 READ_ONLY_TOOLS = {"Read", "Glob", "Grep"}
 CLI_UNSUPPORTED = {"$schema", "minContains", "maxContains"}
+CLI_UNSUPPORTED_TOP = {"allOf", "anyOf", "oneOf", "if", "then", "else", "not"}
 
 HARNESS_CONTRACT = """\
 # Harness contract (staff harness, read stage)
@@ -81,10 +85,15 @@ def build_prompt(agent_path, plugins_root):
 
 
 def cli_schema(schema):
+    top = {k: v for k, v in schema.items() if k not in CLI_UNSUPPORTED_TOP}
+    return _strip(top)
+
+
+def _strip(schema):
     if isinstance(schema, dict):
-        return {k: cli_schema(v) for k, v in schema.items() if k not in CLI_UNSUPPORTED}
+        return {k: _strip(v) for k, v in schema.items() if k not in CLI_UNSUPPORTED}
     if isinstance(schema, list):
-        return [cli_schema(v) for v in schema]
+        return [_strip(v) for v in schema]
     return schema
 
 
