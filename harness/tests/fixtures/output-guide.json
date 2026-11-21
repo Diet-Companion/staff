@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "analyst",
+  "intake": {
+    "ref": "example/shop#9",
+    "area": "billing",
+    "batch_number": 1,
+    "is_kickoff": true
+  },
+  "outcome": "interview_guide",
+  "decision_summary": "Kickoff for billing: schedule the interview.",
+  "requirements": [],
+  "questions": [],
+  "assumptions": [],
+  "interview_guide": {
+    "topics": [
+      {
+        "topic_id": "T-01",
+        "category": "actors",
+        "text": "Who pays, and who approves refunds?",
+        "blocking": true
+      },
+      {
+        "topic_id": "T-02",
+        "category": "out_of_scope",
+        "text": "Which payment methods are out of scope?",
+        "blocking": false
+      }
+    ]
+  },
+  "source_refs": [
+    "example/shop#9"
+  ]
+}

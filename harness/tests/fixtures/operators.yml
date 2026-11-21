@@ -1,0 +1,5 @@
+# Test operators. Handles only.
+version: 1
+operators:
+  - github: test-operator
+  - github: Second-Op
