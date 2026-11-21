@@ -1,0 +1,170 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "architect",
+  "trigger": { "kind": "ready_gate_merge", "ref": "pr#41", "area": "orders" },
+  "outcome": "design",
+  "decision_summary": "Decide first: Q-001 (ADR-004) how order-status reads meet the REQ-012 latency target; recommended b (read replica). New component CMP-007 order-query and interface IF-003 order-status 1.0.0; compatibility_policy for IF-003 is yours to set (Q-002). Open: A-001, the peak request rate, which no source states. Drafted QAS-002 for REQ-012.",
+  "artifacts": [
+    {
+      "type": "qas",
+      "id": "QAS-002",
+      "status": "draft",
+      "area": "orders",
+      "req": "REQ-012",
+      "attribute": "performance",
+      "stimulus": "A signed-in customer requests the status of one order.",
+      "environment": "Normal operation at the request rate in A-001.",
+      "artifact": "IF-003",
+      "response": "The status is returned.",
+      "measure": { "statement": "p95 latency at most 300 ms", "value": 300, "unit": "ms", "cites": ["REQ-012/AC-001", "A-001"] },
+      "addressed_by": ["ADR-004", "CMP-007"],
+      "gap_accepted_by": null,
+      "verification": { "method": "monitor", "owner": "DEVOPS", "where": "both" },
+      "revision": [{ "date": "2026-11-21", "change": "Drafted.", "reason": "REQ-012 became ready with no QAS.", "source_ref": "pr#41" }]
+    },
+    {
+      "type": "adr",
+      "id": "ADR-004",
+      "title": "Serve order-status reads from a read replica",
+      "status": "proposed",
+      "area": "orders",
+      "date": "2026-11-21",
+      "design_for": ["ticket#88"],
+      "drivers": ["REQ-012", "QAS-002"],
+      "context": { "text": "Order-status reads share the write store today (CMP-002). REQ-012 sets a p95 target that the current design has no measure for.", "cites": ["CMP-002", "REQ-012"] },
+      "options": [
+        {
+          "key": "a",
+          "summary": "Keep the current design: reads go to the write store.",
+          "keeps_current_design": true,
+          "satisfies": [],
+          "pros": "No new component or store.",
+          "cons": "No evidence it meets QAS-002 at the A-001 rate.",
+          "cost": "None beyond today (CMP-002).",
+          "reversibility": "two-way",
+          "risks": "Read load contends with writes.",
+          "constraints": [],
+          "affects": ["CMP-002"],
+          "consequences": "QAS-002 may need a gap acceptance.",
+          "cites": ["CMP-002"]
+        },
+        {
+          "key": "b",
+          "summary": "Add a query component that reads a replica of the order store.",
+          "satisfies": ["REQ-012", "QAS-002"],
+          "pros": "Isolates read load from writes.",
+          "cons": "Replica lag makes status eventually consistent.",
+          "cost": "One more stateless unit; replica cost is open (A-001).",
+          "reversibility": "costly",
+          "risks": "Lag beyond the target window.",
+          "constraints": [
+            { "id": "ADR-004/C-001", "statement": "Only CMP-007 reads the order replica.", "kind": "data", "check": "architecture/orders/conformance/replica-readers.yml" },
+            { "id": "ADR-004/C-002", "statement": "Status responses state the replica timestamp.", "kind": "interface", "check": "review" }
+          ],
+          "affects": ["CMP-002", "CMP-007", "IF-003"],
+          "consequences": "IF-003 is served by CMP-007.",
+          "cites": ["REQ-012", "A-001"]
+        }
+      ],
+      "recommended": { "option": "b", "reason": "It is the only option with a path to QAS-002 without a gap." },
+      "decision": null,
+      "exceptions": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "superseded_reason": null,
+      "deprecated_reason": null,
+      "review_dispositions": [],
+      "review_waiver": null,
+      "sources": ["REQ-012", "CMP-002", "pr#41"],
+      "assumptions": [{ "id": "A-001", "key": { "entity": "order", "target_id": "order-status.get", "attribute": "peak request rate" }, "text": "No source states the peak request rate.", "status": "open", "blocking": true }],
+      "questions": [{ "id": "Q-001", "key": { "entity": "order", "target_id": "order-status.get", "attribute": "read path" }, "status": "open", "blocking": true }],
+      "revision": [{ "date": "2026-11-21", "change": "Drafted.", "reason": "Design need of pr#41.", "source_ref": "pr#41" }]
+    },
+    {
+      "type": "component",
+      "id": "CMP-007",
+      "name": "order-query",
+      "status": "proposed",
+      "area": "orders",
+      "design_for": ["ticket#88"],
+      "responsibilities": "Serves order-status reads from the order replica.",
+      "provides": ["IF-003"],
+      "consumes": [],
+      "allowed_dependencies": ["CMP-002"],
+      "code_paths": ["src/orders/query/**"],
+      "data": [{ "store": "order-replica" }],
+      "deployment": { "unit": "order-query", "state": "stateless", "runtime_dependencies": ["order-replica"] },
+      "testability": [
+        { "item": "stable_names", "state": "provided", "gap_accepted_by": null },
+        { "item": "run_id_correlation", "state": "provided", "gap_accepted_by": null },
+        { "item": "readiness_endpoint", "state": "provided", "gap_accepted_by": null },
+        { "item": "structured_errors", "state": "provided", "gap_accepted_by": null },
+        { "item": "seam_feature_flags", "state": "n/a", "reason": "No feature flags.", "gap_accepted_by": null },
+        { "item": "seam_clock", "state": "provided", "gap_accepted_by": null },
+        { "item": "seam_external_dependencies", "subject": "order-replica", "state": "provided", "gap_accepted_by": null },
+        { "item": "seeding_cleanup", "state": "n/a", "reason": "Owns no writable data.", "gap_accepted_by": null }
+      ],
+      "provenance": "designed",
+      "provenance_confirmed_by": null,
+      "cites": ["ADR-004"],
+      "revision": [{ "date": "2026-11-21", "change": "Drafted.", "reason": "Option b of ADR-004.", "source_ref": "pr#41" }]
+    },
+    {
+      "type": "interface",
+      "id": "IF-003",
+      "name": "order-status",
+      "kind": "api",
+      "area": "orders",
+      "owner": "CMP-007",
+      "design_for": ["ticket#88"],
+      "compatibility_policy": null,
+      "consumers": ["external"],
+      "cites": ["REQ-012", "ADR-004"],
+      "versions": [{ "version": "1.0.0", "status": "draft", "spec": "architecture/orders/interfaces/IF-003/1.0.0.yaml", "sunset": null, "replacement": null, "provenance": "designed", "provenance_confirmed_by": null, "external_retired_by": null }],
+      "revision": [{ "date": "2026-11-21", "change": "Drafted.", "reason": "REQ-012 needs a status read.", "source_ref": "ticket#88" }]
+    }
+  ],
+  "spec_versions": [
+    { "if_id": "IF-003", "version": "1.0.0", "format": "openapi", "document": "openapi: 3.1.0\ninfo: {title: order-status, version: 1.0.0}\npaths: {}\n" }
+  ],
+  "conflicts": [
+    { "constraint_id": "ADR-001/C-002", "adr": "ADR-004", "option_key": "b", "resolution": "avoid", "reason": "ADR-001/C-002 keeps the order store single-writer; the replica is read-only, so option b keeps it." }
+  ],
+  "defect_items": [],
+  "questions": [
+    {
+      "id": "Q-001",
+      "key": { "entity": "order", "target_id": "order-status.get", "attribute": "read path" },
+      "adr": "ADR-004",
+      "blocks": ["ADR-004", "QAS-002"],
+      "blocking": true,
+      "text": "How should order-status reads meet the REQ-012 p95 target?",
+      "options": [
+        { "id": "a", "text": "Keep the current design." },
+        { "id": "b", "text": "Add order-query on a read replica." }
+      ],
+      "recommended": "b",
+      "priority": 1
+    },
+    {
+      "id": "Q-002",
+      "key": { "entity": "interface", "target_id": "IF-003", "attribute": "compatibility_policy" },
+      "blocks": ["IF-003"],
+      "blocking": true,
+      "text": "Is IF-003 public or internal?",
+      "options": [
+        { "id": "a", "text": "Public: deprecated versions get a sunset of at least 90 days." },
+        { "id": "b", "text": "Internal: no sunset; retired once no consumer is left." }
+      ],
+      "recommended": "a",
+      "priority": 2
+    }
+  ],
+  "assumptions": [
+    { "id": "A-001", "key": { "entity": "order", "target_id": "order-status.get", "attribute": "peak request rate" }, "text": "No source states the peak request rate.", "blocking": true }
+  ],
+  "answers_applied": [],
+  "advisory_notes": [],
+  "private_reports": [],
+  "source_refs": ["pr#41", "ticket#88", "REQ-012", "CMP-002", "ADR-001"]
+}

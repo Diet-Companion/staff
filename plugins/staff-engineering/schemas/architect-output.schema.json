@@ -1,0 +1,859 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-engineering:architect-output:1.0.0",
+  "title": "Architect read-stage output",
+  "description": "Structured output of the Architect read stage (S-ARCH-037). The staff-core harness validates it and rejects any action outside the allowed set (S-SEC-002, S-SEC-003). Free-text fields and spec description strings are quoted data, at most 2,000 characters each (S-ARCH-037). Artifact fields follow S-ARCH-006 to S-ARCH-009; IDs follow S-ARCH-005.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "trigger",
+    "outcome",
+    "decision_summary",
+    "artifacts",
+    "spec_versions",
+    "conflicts",
+    "defect_items",
+    "questions",
+    "assumptions",
+    "answers_applied",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "agent": { "const": "architect" },
+    "trigger": {
+      "description": "What started this run (S-ARCH-034). One run covers one design need, one area's drift batch, or one component or interface of a bootstrap (S-ARCH-039).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "area"],
+      "properties": {
+        "kind": {
+          "description": "ready_gate_merge: a ready-gate PR merged with a quality REQ pending. arch_design: an operator applied arch:design. arch_bootstrap: an operator dispatched arch:bootstrap. answer: the human answered on a design-need or drift ticket. review: the human reviewed an Architect PR. nightly: drift, an unanswered quality REQ, or a stale ARCH citation. ba_trace: the BA trace check flagged an ARCH artifact.",
+          "enum": ["ready_gate_merge", "arch_design", "arch_bootstrap", "answer", "review", "nightly", "ba_trace"]
+        },
+        "ref": { "$ref": "#/$defs/ref" },
+        "area": { "$ref": "#/$defs/area" }
+      }
+    },
+    "outcome": {
+      "description": "design: artifacts drafted. drift: drift questions for one area. blocked: defect items or questions stop any draft. no_op: nothing to do; decision_summary says why.",
+      "enum": ["design", "drift", "blocked", "no_op"]
+    },
+    "decision_summary": {
+      "description": "Required. The decisions the human has to make, first: one line per ADR question, new components, widened allowed_dependencies, data changes, gaps proposed for acceptance, breaking changes, deprecations, exceptions, defect items. Prose follows (S-ARCH-018, S-ARCH-042).",
+      "$ref": "#/$defs/text"
+    },
+    "artifacts": {
+      "description": "Drafted ADRs, components, interfaces and QAS (S-ARCH-006 to S-ARCH-009). At most 10 per run, of which at most 3 ADRs (S-ARCH-018).",
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/artifact" },
+      "if": { "contains": { "properties": { "type": { "const": "adr" } }, "required": ["type"] } },
+      "then": { "contains": { "properties": { "type": { "const": "adr" } }, "required": ["type"] }, "maxContains": 3 }
+    },
+    "spec_versions": {
+      "description": "The full spec of each new or changed interface version, in the stack's format, validated against that format's schema by the harness (S-ARCH-008, S-ARCH-037).",
+      "type": "array",
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/spec_version" }
+    },
+    "conflicts": {
+      "description": "Drafted options that clash with a constraint of an accepted ADR (S-ARCH-018, S-ARCH-037).",
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/conflict" }
+    },
+    "defect_items": {
+      "description": "Requirement-defect items in the S-BA-048 form, posted on the requirement's ticket (S-ARCH-017).",
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/defect_item" }
+    },
+    "questions": {
+      "description": "At most 7, blocking first, in the S-BA-014 form. One per ADR with adr set; drift questions with drift_id set (S-ARCH-018, S-ARCH-028).",
+      "type": "array",
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/question" }
+    },
+    "assumptions": {
+      "description": "Assumptions raised in this run, including every load figure, cost or capacity no source states (S-ARCH-014).",
+      "type": "array",
+      "maxItems": 30,
+      "items": { "$ref": "#/$defs/run_assumption" }
+    },
+    "answers_applied": {
+      "description": "Human-owned fields set in this run, each citing an operator comment (S-ARCH-020).",
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "field", "comment_ref"],
+        "properties": {
+          "target": { "$ref": "#/$defs/arch_id" },
+          "field": {
+            "description": "Path of the field inside the target, for example decision.chosen or exceptions[0].accepted_by.",
+            "$ref": "#/$defs/short_text"
+          },
+          "comment_ref": { "$ref": "#/$defs/ref" }
+        }
+      }
+    },
+    "advisory_notes": {
+      "description": "Rule candidates found while designing. Never written to knowledge/**; the digest lists them (S-ARCH-046).",
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "text", "source_refs"],
+        "properties": {
+          "kind": { "const": "rule_candidate" },
+          "text": { "$ref": "#/$defs/text" },
+          "source_refs": { "$ref": "#/$defs/cites" }
+        }
+      }
+    },
+    "private_reports": {
+      "description": "Suspected vulnerabilities or exposed secrets. The write stage files a private report and a digest pointer; never a public comment (S-SEC-011, S-ARCH-028).",
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/private_report" }
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites (S-ARCH-014).",
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/ref" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "design" } }, "required": ["outcome"] },
+      "then": { "properties": { "artifacts": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "drift" } }, "required": ["outcome"] },
+      "then": {
+        "properties": {
+          "artifacts": { "maxItems": 0 },
+          "spec_versions": { "maxItems": 0 },
+          "questions": { "minItems": 1, "items": { "required": ["drift_id"] } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "blocked" } }, "required": ["outcome"] },
+      "then": {
+        "properties": { "artifacts": { "maxItems": 0 }, "spec_versions": { "maxItems": 0 } },
+        "anyOf": [
+          { "properties": { "defect_items": { "minItems": 1 } } },
+          { "properties": { "questions": { "minItems": 1 } } }
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "no_op" } }, "required": ["outcome"] },
+      "then": {
+        "properties": {
+          "artifacts": { "maxItems": 0 },
+          "spec_versions": { "maxItems": 0 },
+          "conflicts": { "maxItems": 0 },
+          "defect_items": { "maxItems": 0 },
+          "questions": { "maxItems": 0 }
+        }
+      }
+    },
+    {
+      "description": "A bootstrap run drafts one component or one interface (S-ARCH-034).",
+      "if": {
+        "properties": { "trigger": { "properties": { "kind": { "const": "arch_bootstrap" } }, "required": ["kind"] } },
+        "required": ["trigger"]
+      },
+      "then": {
+        "properties": {
+          "artifacts": {
+            "maxItems": 1,
+            "items": { "properties": { "type": { "enum": ["component", "interface"] } } }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "short_text": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "ref": {
+      "description": "A source ref: ticket, comment, REQ or AC ID, R-ID, ARCH ID, spec ref, code ref, CI result or doc path.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "owner_ref": {
+      "description": "Human-owned: null unless an operator answer set it; then the operator comment ref (S-ARCH-020).",
+      "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/ref" }]
+    },
+    "area": {
+      "description": "An area key from .staff/areas.yml (S-GEN-060). Cross-area artifacts use the area that maps architecture/system/.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+    },
+    "date": { "type": "string", "format": "date" },
+    "semver": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "path_glob": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "^[^\\s]+$" },
+    "req_id": { "type": "string", "pattern": "^REQ-[0-9]{3,}$" },
+    "any_req_id": { "type": "string", "pattern": "^REQ-[0-9]{3,}(/AC-[0-9]{3,})?$" },
+    "adr_id": { "type": "string", "pattern": "^ADR-[0-9]{3,}$" },
+    "constraint_id": { "type": "string", "pattern": "^ADR-[0-9]{3,}/C-[0-9]{3,}$" },
+    "cmp_id": { "type": "string", "pattern": "^CMP-[0-9]{3,}$" },
+    "if_id": { "type": "string", "pattern": "^IF-[0-9]{3,}$" },
+    "if_version_id": { "type": "string", "pattern": "^IF-[0-9]{3,}@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "qas_id": { "type": "string", "pattern": "^QAS-[0-9]{3,}$" },
+    "arch_id": {
+      "description": "Any ARCH ID: ADR-n, ADR-n/C-k, CMP-n, IF-n, IF-n@x.y.z or QAS-n (S-ARCH-005).",
+      "type": "string",
+      "pattern": "^(ADR-[0-9]{3,}(/C-[0-9]{3,})?|CMP-[0-9]{3,}|IF-[0-9]{3,}(@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))?|QAS-[0-9]{3,})$"
+    },
+    "any_id": {
+      "description": "A REQ, AC or ARCH ID.",
+      "anyOf": [{ "$ref": "#/$defs/any_req_id" }, { "$ref": "#/$defs/arch_id" }]
+    },
+    "question_id": { "type": "string", "pattern": "^Q-[0-9]{3,}$" },
+    "assumption_id": { "type": "string", "pattern": "^A-[0-9]{3,}$" },
+    "option_key": { "type": "string", "pattern": "^[a-d]$" },
+    "cites": {
+      "description": "Source refs or assumption IDs. A statement with no source cites an open assumption (S-ARCH-014).",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/ref" }
+    },
+    "cited_text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "cites"],
+      "properties": {
+        "text": { "$ref": "#/$defs/text" },
+        "cites": { "$ref": "#/$defs/cites" }
+      }
+    },
+    "key": {
+      "description": "What a question or assumption is about (S-BA-007 form). target_id is a stable ID or name (S-TESTAB-005), or null.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "target_id", "attribute"],
+      "properties": {
+        "entity": { "$ref": "#/$defs/short_text" },
+        "target_id": { "type": ["string", "null"], "maxLength": 200 },
+        "attribute": { "$ref": "#/$defs/short_text" }
+      }
+    },
+    "revision": {
+      "description": "One entry per change (S-BA-006 form).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["date", "change", "reason", "source_ref"],
+        "properties": {
+          "date": { "$ref": "#/$defs/date" },
+          "change": { "$ref": "#/$defs/text" },
+          "reason": { "$ref": "#/$defs/text" },
+          "source_ref": { "$ref": "#/$defs/ref" }
+        }
+      }
+    },
+    "design_for": {
+      "description": "The tickets of the design need this artifact answers (S-ARCH-015).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/ref" }
+    },
+    "artifact_question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "status", "blocking"],
+      "properties": {
+        "id": { "$ref": "#/$defs/question_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "status": { "description": "answered is human-owned (S-BA-015).", "enum": ["open", "answered"] },
+        "blocking": { "type": "boolean" },
+        "answer_ref": { "$ref": "#/$defs/ref" }
+      }
+    },
+    "artifact_assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "text", "status", "blocking"],
+      "properties": {
+        "id": { "$ref": "#/$defs/assumption_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "text": { "$ref": "#/$defs/text" },
+        "status": { "description": "confirmed and rejected are human-owned (S-BA-015).", "enum": ["open", "confirmed", "rejected"] },
+        "blocking": { "type": "boolean" },
+        "answer_ref": { "$ref": "#/$defs/ref" }
+      }
+    },
+    "review_dispositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding_id", "disposition", "ref"],
+        "properties": {
+          "finding_id": { "$ref": "#/$defs/short_text" },
+          "disposition": { "description": "accepted and rejected are human-owned (S-ARCH-020).", "enum": ["declared", "accepted", "rejected"] },
+          "ref": { "$ref": "#/$defs/ref" }
+        }
+      }
+    },
+    "review_waiver": {
+      "description": "Human-owned (S-ARCH-020).",
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ref", "revision"],
+          "properties": { "ref": { "$ref": "#/$defs/ref" }, "revision": { "$ref": "#/$defs/short_text" } }
+        }
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["type"],
+      "properties": { "type": { "enum": ["adr", "component", "interface", "qas"] } },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "adr" } } }, "then": { "$ref": "#/$defs/adr" } },
+        { "if": { "properties": { "type": { "const": "component" } } }, "then": { "$ref": "#/$defs/component" } },
+        { "if": { "properties": { "type": { "const": "interface" } } }, "then": { "$ref": "#/$defs/interface" } },
+        { "if": { "properties": { "type": { "const": "qas" } } }, "then": { "$ref": "#/$defs/qas" } }
+      ]
+    },
+    "constraint": {
+      "description": "A rule an option imposes; applies only once that option is chosen (S-ARCH-005, S-ARCH-006).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "kind", "check"],
+      "properties": {
+        "id": { "$ref": "#/$defs/constraint_id" },
+        "statement": { "$ref": "#/$defs/text" },
+        "kind": { "enum": ["dependency", "interface", "technology", "data", "deployment", "other"] },
+        "check": {
+          "description": "review (goes to the developer's code checklist, S-ARCH-026), or a conformance rule ref under architecture/<area>/conformance/.",
+          "type": "string",
+          "maxLength": 500,
+          "pattern": "^(review|architecture/[a-z0-9][a-z0-9-]{0,63}/conformance/[^\\s]+)$"
+        }
+      }
+    },
+    "adr_option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "summary", "satisfies", "pros", "cons", "cost", "reversibility", "risks", "constraints", "affects", "consequences", "cites"],
+      "properties": {
+        "key": { "$ref": "#/$defs/option_key" },
+        "summary": { "$ref": "#/$defs/text" },
+        "keeps_current_design": {
+          "description": "True for the 'keep the current design' option (S-ARCH-006).",
+          "type": "boolean"
+        },
+        "satisfies": {
+          "description": "The drivers this option satisfies.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "pros": { "$ref": "#/$defs/text" },
+        "cons": { "$ref": "#/$defs/text" },
+        "cost": { "description": "Cited, or citing an open assumption (S-ARCH-014).", "$ref": "#/$defs/text" },
+        "reversibility": { "enum": ["two-way", "costly", "one-way"] },
+        "risks": { "$ref": "#/$defs/text" },
+        "constraints": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/constraint" } },
+        "affects": { "type": "array", "items": { "$ref": "#/$defs/arch_id" } },
+        "consequences": { "$ref": "#/$defs/text" },
+        "cites": { "$ref": "#/$defs/cites" }
+      }
+    },
+    "adr": {
+      "description": "ADR fields (S-ARCH-006).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "title", "status", "area", "date", "design_for", "drivers", "context", "options", "recommended", "decision", "exceptions", "sources", "assumptions", "questions", "revision"],
+      "properties": {
+        "type": { "const": "adr" },
+        "id": { "$ref": "#/$defs/adr_id" },
+        "title": { "$ref": "#/$defs/short_text" },
+        "status": {
+          "description": "New drafts are proposed. accepted and rejected follow decision.outcome (S-ARCH-011).",
+          "enum": ["proposed", "accepted", "rejected", "superseded", "deprecated"]
+        },
+        "area": { "$ref": "#/$defs/area" },
+        "date": { "$ref": "#/$defs/date" },
+        "design_for": { "$ref": "#/$defs/design_for" },
+        "drivers": {
+          "description": "REQ IDs (quality REQs first), QAS IDs, or an operator comment ref for a technical decision with no requirement.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "context": { "$ref": "#/$defs/cited_text" },
+        "options": {
+          "description": "2 to 4 real options (starting value, S-ARCH-006).",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/adr_option" }
+        },
+        "recommended": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["option", "reason"],
+          "properties": {
+            "option": { "$ref": "#/$defs/option_key" },
+            "reason": { "$ref": "#/$defs/text" }
+          }
+        },
+        "decision": {
+          "description": "Human-owned (S-ARCH-020). null in every draft.",
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["outcome", "chosen", "decided_by"],
+              "properties": {
+                "outcome": { "enum": ["accepted", "rejected"] },
+                "chosen": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/option_key" }] },
+                "decided_by": { "$ref": "#/$defs/ref" }
+              },
+              "if": { "properties": { "outcome": { "const": "accepted" } } },
+              "then": { "properties": { "chosen": { "$ref": "#/$defs/option_key" } } }
+            }
+          ]
+        },
+        "exceptions": {
+          "description": "Time-bound exceptions, expiring at most 90 days ahead (starting value, S-ARCH-028). accepted_by is human-owned.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["constraint", "paths", "reason", "accepted_by", "expires"],
+            "properties": {
+              "constraint": { "$ref": "#/$defs/constraint_id" },
+              "paths": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/path_glob" } },
+              "reason": { "$ref": "#/$defs/text" },
+              "accepted_by": { "$ref": "#/$defs/owner_ref" },
+              "expires": { "$ref": "#/$defs/date" }
+            }
+          }
+        },
+        "supersedes": { "type": "array", "items": { "$ref": "#/$defs/adr_id" } },
+        "superseded_by": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/adr_id" }] },
+        "superseded_reason": {
+          "description": "Human-owned (S-ARCH-020).",
+          "enum": [null, "wrong", "context-changed", "refined"]
+        },
+        "deprecated_reason": {
+          "description": "Human-owned (S-ARCH-020).",
+          "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/text" }]
+        },
+        "review_dispositions": { "$ref": "#/$defs/review_dispositions" },
+        "review_waiver": { "$ref": "#/$defs/review_waiver" },
+        "sources": { "$ref": "#/$defs/cites" },
+        "assumptions": { "type": "array", "items": { "$ref": "#/$defs/artifact_assumption" } },
+        "questions": { "type": "array", "items": { "$ref": "#/$defs/artifact_question" } },
+        "revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "testability_item": {
+      "description": "One S-ARCH-025 item. n/a and gap need a reason; gap needs gap_accepted_by from the human.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "state", "gap_accepted_by"],
+      "properties": {
+        "item": {
+          "enum": ["stable_names", "run_id_correlation", "readiness_endpoint", "structured_errors", "seam_feature_flags", "seam_clock", "seam_external_dependencies", "seeding_cleanup"]
+        },
+        "subject": {
+          "description": "Which flag, external dependency or store, where the item is per thing.",
+          "$ref": "#/$defs/short_text"
+        },
+        "state": { "enum": ["provided", "n/a", "gap"] },
+        "reason": { "$ref": "#/$defs/text" },
+        "gap_accepted_by": { "$ref": "#/$defs/owner_ref" }
+      },
+      "if": { "properties": { "state": { "enum": ["n/a", "gap"] } }, "required": ["state"] },
+      "then": { "required": ["reason"] }
+    },
+    "component": {
+      "description": "Component fields (S-ARCH-007).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "name", "status", "area", "design_for", "responsibilities", "provides", "consumes", "allowed_dependencies", "code_paths", "data", "deployment", "testability", "provenance", "provenance_confirmed_by", "cites", "revision"],
+      "properties": {
+        "type": { "const": "component" },
+        "id": { "$ref": "#/$defs/cmp_id" },
+        "name": {
+          "description": "Immutable stable name (S-ARCH-024, S-TESTAB-005).",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "status": {
+          "description": "New drafts are proposed (S-ARCH-011).",
+          "enum": ["proposed", "active", "deprecated", "retired"]
+        },
+        "area": { "$ref": "#/$defs/area" },
+        "design_for": { "$ref": "#/$defs/design_for" },
+        "responsibilities": { "$ref": "#/$defs/text" },
+        "provides": { "type": "array", "items": { "$ref": "#/$defs/if_id" } },
+        "consumes": { "type": "array", "items": { "$ref": "#/$defs/if_id" } },
+        "allowed_dependencies": {
+          "type": "array",
+          "items": { "anyOf": [{ "$ref": "#/$defs/cmp_id" }, { "$ref": "#/$defs/if_id" }] }
+        },
+        "code_paths": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/path_glob" } },
+        "data": {
+          "description": "The stores it owns. A store is shared only if an ADR allows it (S-ARCH-007).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["store"],
+            "properties": {
+              "store": { "$ref": "#/$defs/short_text" },
+              "shared_with": { "type": "array", "items": { "$ref": "#/$defs/cmp_id" } },
+              "allowed_by": { "$ref": "#/$defs/adr_id" }
+            },
+            "if": { "properties": { "shared_with": { "minItems": 1 } }, "required": ["shared_with"] },
+            "then": { "required": ["allowed_by"] }
+          }
+        },
+        "deployment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unit", "state", "runtime_dependencies"],
+          "properties": {
+            "unit": { "$ref": "#/$defs/short_text" },
+            "state": { "enum": ["stateless", "stateful"] },
+            "runtime_dependencies": { "type": "array", "items": { "$ref": "#/$defs/short_text" } }
+          }
+        },
+        "testability": {
+          "description": "Complete: every S-ARCH-025 item appears at least once (S-ARCH-019 item 5).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/testability_item" },
+          "allOf": [
+            { "contains": { "properties": { "item": { "const": "stable_names" } } } },
+            { "contains": { "properties": { "item": { "const": "run_id_correlation" } } } },
+            { "contains": { "properties": { "item": { "const": "readiness_endpoint" } } } },
+            { "contains": { "properties": { "item": { "const": "structured_errors" } } } },
+            { "contains": { "properties": { "item": { "const": "seam_feature_flags" } } } },
+            { "contains": { "properties": { "item": { "const": "seam_clock" } } } },
+            { "contains": { "properties": { "item": { "const": "seam_external_dependencies" } } } },
+            { "contains": { "properties": { "item": { "const": "seeding_cleanup" } } } }
+          ]
+        },
+        "provenance": { "enum": ["designed", "as-built"] },
+        "provenance_confirmed_by": { "$ref": "#/$defs/owner_ref" },
+        "cites": { "type": "array", "items": { "$ref": "#/$defs/adr_id" } },
+        "revision": { "$ref": "#/$defs/revision" }
+      }
+    },
+    "interface_version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "status", "spec", "provenance", "provenance_confirmed_by"],
+      "properties": {
+        "version": { "$ref": "#/$defs/semver" },
+        "status": {
+          "description": "New versions are draft (S-ARCH-011).",
+          "enum": ["draft", "approved", "deprecated", "retired"]
+        },
+        "spec": {
+          "description": "The spec file of this version (S-ARCH-013).",
+          "type": "string",
+          "maxLength": 500,
+          "pattern": "^architecture/[a-z0-9][a-z0-9-]{0,63}/interfaces/IF-[0-9]{3,}/[^/\\s]+$"
+        },
+        "consumers": {
+          "description": "Optional: CMP IDs declared on this version (S-ARCH-021).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/cmp_id" }
+        },
+        "sunset": {
+          "description": "Public interfaces only, at least 90 days after deprecation (S-ARCH-023).",
+          "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/date" }]
+        },
+        "replacement": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/if_version_id" }] },
+        "provenance": { "enum": ["designed", "as-built"] },
+        "provenance_confirmed_by": { "$ref": "#/$defs/owner_ref" },
+        "external_retired_by": { "$ref": "#/$defs/owner_ref" }
+      }
+    },
+    "interface": {
+      "description": "Interface fields (S-ARCH-008).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "name", "kind", "area", "owner", "design_for", "compatibility_policy", "consumers", "cites", "versions", "revision"],
+      "properties": {
+        "type": { "const": "interface" },
+        "id": { "$ref": "#/$defs/if_id" },
+        "name": {
+          "description": "Stable name (S-ARCH-024).",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "kind": { "enum": ["api", "event", "data"] },
+        "area": { "$ref": "#/$defs/area" },
+        "owner": { "$ref": "#/$defs/cmp_id" },
+        "design_for": { "$ref": "#/$defs/design_for" },
+        "compatibility_policy": {
+          "description": "Human-owned (S-ARCH-020). null until an operator answer sets it.",
+          "enum": [null, "public", "internal"]
+        },
+        "consumers": {
+          "type": "array",
+          "items": { "anyOf": [{ "$ref": "#/$defs/cmp_id" }, { "const": "external" }] }
+        },
+        "cites": {
+          "description": "REQ and ADR IDs.",
+          "type": "array",
+          "items": { "anyOf": [{ "$ref": "#/$defs/any_req_id" }, { "$ref": "#/$defs/adr_id" }] }
+        },
+        "versions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/interface_version" } },
+        "revision": { "$ref": "#/$defs/revision" }
+      },
+      "if": { "properties": { "compatibility_policy": { "const": "internal" } }, "required": ["compatibility_policy"] },
+      "then": { "properties": { "versions": { "items": { "properties": { "sunset": { "type": "null" } } } } } }
+    },
+    "qas": {
+      "description": "QAS fields (S-ARCH-009).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "status", "area", "req", "attribute", "stimulus", "environment", "artifact", "response", "measure", "addressed_by", "gap_accepted_by", "verification", "revision"],
+      "properties": {
+        "type": { "const": "qas" },
+        "id": { "$ref": "#/$defs/qas_id" },
+        "status": {
+          "description": "New drafts are draft (S-ARCH-011).",
+          "enum": ["draft", "accepted", "retired"]
+        },
+        "area": { "$ref": "#/$defs/area" },
+        "req": { "$ref": "#/$defs/req_id" },
+        "attribute": { "$ref": "#/$defs/short_text" },
+        "stimulus": { "$ref": "#/$defs/text" },
+        "environment": { "$ref": "#/$defs/text" },
+        "artifact": { "anyOf": [{ "$ref": "#/$defs/cmp_id" }, { "$ref": "#/$defs/if_id" }] },
+        "response": { "$ref": "#/$defs/text" },
+        "measure": {
+          "description": "With a unit, equal to the REQ target or stricter (S-ARCH-009).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["statement", "value", "unit", "cites"],
+          "properties": {
+            "statement": { "$ref": "#/$defs/text" },
+            "value": { "type": "number" },
+            "unit": { "$ref": "#/$defs/short_text" },
+            "cites": { "$ref": "#/$defs/cites" }
+          }
+        },
+        "addressed_by": {
+          "anyOf": [
+            { "const": "gap" },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": { "anyOf": [{ "$ref": "#/$defs/adr_id" }, { "$ref": "#/$defs/cmp_id" }] }
+            }
+          ]
+        },
+        "gap_reason": { "$ref": "#/$defs/text" },
+        "gap_accepted_by": { "$ref": "#/$defs/owner_ref" },
+        "verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "owner"],
+          "properties": {
+            "method": { "enum": ["test", "monitor", "analysis"] },
+            "owner": { "enum": ["QA", "DEVOPS"] },
+            "where": {
+              "description": "monitor only. Absent reads as both (S-ARCH-009).",
+              "enum": ["pre-production", "production", "both"]
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "method": { "const": "test" } }, "required": ["method"] },
+              "then": { "properties": { "owner": { "const": "QA" } } }
+            },
+            {
+              "if": { "properties": { "method": { "enum": ["test", "analysis"] } }, "required": ["method"] },
+              "then": { "not": { "required": ["where"] } }
+            }
+          ]
+        },
+        "replaced_by": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/qas_id" }] },
+        "revision": { "$ref": "#/$defs/revision" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "addressed_by": { "const": "gap" } }, "required": ["addressed_by"] },
+          "then": { "required": ["gap_reason"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "retired" } }, "required": ["status"] },
+          "then": { "required": ["replaced_by"], "properties": { "replaced_by": { "$ref": "#/$defs/qas_id" } } }
+        }
+      ]
+    },
+    "spec_version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["if_id", "version", "format", "document"],
+      "properties": {
+        "if_id": { "$ref": "#/$defs/if_id" },
+        "version": { "$ref": "#/$defs/semver" },
+        "format": {
+          "description": "The spec format the product stack uses, for example openapi, asyncapi, graphql-sdl, protobuf or json-schema (S-ARCH-008).",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$"
+        },
+        "document": {
+          "description": "The full spec as text. The harness validates it against its format's schema and caps each description string at 2,000 characters (S-ARCH-037).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60000
+        }
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["constraint_id", "adr", "option_key", "resolution", "reason"],
+      "properties": {
+        "constraint_id": { "description": "The accepted ADR's constraint.", "$ref": "#/$defs/constraint_id" },
+        "adr": { "description": "The drafted ADR whose option clashes.", "$ref": "#/$defs/adr_id" },
+        "option_key": { "$ref": "#/$defs/option_key" },
+        "resolution": { "enum": ["supersede", "avoid"] },
+        "reason": { "$ref": "#/$defs/text" }
+      }
+    },
+    "defect_item": {
+      "description": "Requirement-defect item (S-BA-048). The Architect raises only these three kinds (S-ARCH-017).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "kind", "text", "evidence_refs"],
+      "properties": {
+        "target": { "$ref": "#/$defs/any_req_id" },
+        "kind": { "enum": ["untestable", "contradicts", "infeasible"] },
+        "text": { "$ref": "#/$defs/text" },
+        "evidence_refs": { "$ref": "#/$defs/cites" }
+      }
+    },
+    "question_option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/option_key" },
+        "text": { "$ref": "#/$defs/text" },
+        "action": {
+          "description": "Drift questions only (S-ARCH-028).",
+          "enum": ["fix_code", "change_design", "exception"]
+        },
+        "work_ticket": {
+          "description": "The draft developer ticket for fix_code; it cites the constraint or the version (S-ARCH-028, S-DEV-006).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "body", "cites"],
+          "properties": {
+            "title": { "$ref": "#/$defs/short_text" },
+            "body": { "$ref": "#/$defs/text" },
+            "cites": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "anyOf": [{ "$ref": "#/$defs/constraint_id" }, { "$ref": "#/$defs/if_version_id" }] }
+            }
+          }
+        }
+      },
+      "if": { "properties": { "action": { "const": "fix_code" } }, "required": ["action"] },
+      "then": { "required": ["work_ticket"] }
+    },
+    "question": {
+      "description": "A question in the S-BA-014 form. adr for an ADR question, drift_id for a drift question; never both (S-ARCH-037).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "blocks", "blocking", "text", "options", "recommended", "priority"],
+      "properties": {
+        "id": { "$ref": "#/$defs/question_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "adr": { "$ref": "#/$defs/adr_id" },
+        "drift_id": {
+          "description": "The drift-report finding this question is about.",
+          "$ref": "#/$defs/ref"
+        },
+        "blocks": {
+          "description": "The REQ, AC or ARCH IDs this question blocks.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/any_id" }
+        },
+        "blocking": { "type": "boolean" },
+        "text": { "$ref": "#/$defs/text" },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/question_option" }
+        },
+        "recommended": {
+          "description": "Shown to the human; never applied without an answer (S-BA-015).",
+          "$ref": "#/$defs/option_key"
+        },
+        "priority": { "type": "integer", "minimum": 1, "maximum": 7 }
+      },
+      "not": { "required": ["adr", "drift_id"] },
+      "if": { "required": ["drift_id"] },
+      "then": {
+        "description": "Each drift question offers exactly: fix the code, change the design, time-bound exception (S-ARCH-028).",
+        "properties": {
+          "options": {
+            "minItems": 3,
+            "maxItems": 3,
+            "items": { "required": ["action"] },
+            "allOf": [
+              { "contains": { "properties": { "action": { "const": "fix_code" } }, "required": ["action"] } },
+              { "contains": { "properties": { "action": { "const": "change_design" } }, "required": ["action"] } },
+              { "contains": { "properties": { "action": { "const": "exception" } }, "required": ["action"] } }
+            ]
+          }
+        }
+      },
+      "else": { "properties": { "options": { "items": { "not": { "anyOf": [{ "required": ["action"] }, { "required": ["work_ticket"] }] } } } } }
+    },
+    "run_assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "text", "blocking"],
+      "properties": {
+        "id": { "$ref": "#/$defs/assumption_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "text": { "$ref": "#/$defs/text" },
+        "blocking": { "type": "boolean" }
+      }
+    },
+    "private_report": {
+      "description": "Where the suspected issue is, never the secret value or an exploit description (S-SEC-004, S-SEC-011).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "location"],
+      "properties": {
+        "category": { "enum": ["suspected_vulnerability", "exposed_secret"] },
+        "location": { "$ref": "#/$defs/ref" },
+        "note": { "$ref": "#/$defs/text" }
+      }
+    }
+  }
+}

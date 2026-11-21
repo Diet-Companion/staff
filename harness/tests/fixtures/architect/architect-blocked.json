@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "architect",
+  "trigger": { "kind": "arch_design", "ref": "ticket#90", "area": "billing" },
+  "outcome": "blocked",
+  "decision_summary": "Decide first: REQ-020 has no measurable target, so no QAS or ADR is drafted. One defect item raised (untestable).",
+  "artifacts": [],
+  "spec_versions": [],
+  "conflicts": [],
+  "defect_items": [
+    { "target": "REQ-020", "kind": "untestable", "text": "The target says invoices render quickly but names no measure or unit.", "evidence_refs": ["REQ-020"] }
+  ],
+  "questions": [],
+  "assumptions": [],
+  "answers_applied": [],
+  "source_refs": ["ticket#90", "REQ-020"]
+}
