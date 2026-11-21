@@ -32,6 +32,15 @@ staff/
       skills/requirements/SKILL.md     # requirement, AC and rule model, IDs, paths
       skills/elicitation/SKILL.md      # question batches, stage-1 output
       schemas/analyst-output.schema.json
+  harness/                             # read/write-stage harness for headless runs (Python 3.12)
+    build_input.py                     # issue + operator comments -> untrusted input file
+    prepare_agent.py                   # agent + preloaded skills -> system prompt; CLI schema
+    validate_output.py                 # envelope, cost, schema and harness checks
+    redact_check.py                    # fail-closed secret and email scan (S-SEC-004)
+    render_comment.py                  # deterministic Markdown comments
+    run_record.py                      # run record (S-GEN-029)
+    contract.py                        # operators.yml, areas.yml, product.yml readers
+    tests/                             # unittest; run by .github/workflows/harness-tests.yml
   governance/
     guardrails.md                      # G1-G12 and how each is enforced
     product-contract.md                # what a product repo must contain
@@ -72,17 +81,19 @@ The full target layout (more plugins, `evals/`, `metrics/`, `ops/`, `experiments
 
    Interactively, the same steps are `/plugin marketplace add Diet-Companion/staff@v0.1.0` and `/plugin install staff-product@staff`.
 
-4. Run the Analyst read stage headless, with the schema as the output contract, the job's turn limit and a 20-minute timeout ($3 / 20 min per run, S-BA-038):
+4. Run the Analyst through the harness in [`harness/`](harness/), from a human-authored product workflow (for example `diet-companion`'s `.github/workflows/staff-analyst.yml`). The harness builds the input file, the system prompt and the CLI schema, then validates, redaction-checks, renders and records:
 
    ```sh
-   claude -p --agent staff-product:analyst \
-     --json-schema "$(cat <path-to-installed-plugin>/schemas/analyst-output.schema.json)" \
-     --output-format json \
-     --max-turns <n> \
-     "<redacted intake ticket text>"
+   python harness/prepare_agent.py --agent plugins/staff-product/agents/analyst.md \
+     --plugins-root plugins --schema plugins/staff-product/schemas/analyst-output.schema.json \
+     --out-prompt system-prompt.md --out-schema cli-schema.json
+   claude -p --restricted --tools Read,Glob,Grep --allowedTools Read,Glob,Grep \
+     --append-system-prompt-file system-prompt.md --json-schema "$(cat cli-schema.json)" \
+     --add-dir <input dir> --max-turns 15 --max-budget-usd 3 --output-format json \
+     "Work the intake in the JSON file <input dir>/input.json. ..."
    ```
 
-   Feed the validated JSON, never the raw ticket, to a separate comment-only step (S-SEC-002).
+   `claude --agent staff-product:analyst` is not used headlessly. In Claude Code 2.1.329 a main-session agent gets no `skills:` preload, and its `tools:` list also removes the tool that `--json-schema` needs. See `harness/prepare_agent.py`. Feed the validated JSON, never the raw ticket, to a separate comment-only step (S-SEC-002).
 
 ## Changing this repo
 

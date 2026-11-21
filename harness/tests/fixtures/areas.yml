@@ -1,0 +1,8 @@
+# Synthetic product for harness tests.
+areas:
+  orders:      # placing and cancelling orders
+    paths: [requirements/orders/**, knowledge/rules/orders/**]
+  billing:
+    paths:
+      - requirements/billing/**
+      - knowledge/rules/billing/**

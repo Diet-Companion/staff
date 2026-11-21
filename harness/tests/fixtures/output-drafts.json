@@ -1,0 +1,403 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "analyst",
+  "intake": {
+    "ref": "example/shop#7",
+    "area": "orders",
+    "batch_number": 2,
+    "is_kickoff": false
+  },
+  "outcome": "drafts_and_questions",
+  "ready_gate": false,
+  "decision_summary": "Decide first: Q-001 (refund method) and the new rule in REQ-002.\n\nDrafted one epic and two stories.",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "type": "epic",
+      "title": "Order cancellation",
+      "status": "draft",
+      "area": "orders",
+      "parent": null,
+      "intent": {
+        "actor": "Customer",
+        "need": "Cancel an order before it ships",
+        "business_value": "Fewer support tickets",
+        "cites": [
+          "example/shop#7"
+        ]
+      },
+      "scope": {
+        "in": [
+          {
+            "text": "Cancelling a whole order",
+            "cites": [
+              "example/shop#7"
+            ]
+          }
+        ],
+        "out": [
+          {
+            "text": "Partial cancellation",
+            "cites": [
+              "A-001"
+            ]
+          }
+        ]
+      },
+      "acceptance_criteria": [],
+      "rules": [],
+      "changes": [],
+      "quality": {
+        "none": "No quality target in the intake."
+      },
+      "permissions": {
+        "none": "Only the customer role is affected."
+      },
+      "sources": [
+        "example/shop#7"
+      ],
+      "assumptions": [
+        {
+          "id": "A-001",
+          "key": {
+            "entity": "order",
+            "target_id": null,
+            "attribute": "partial cancellation"
+          },
+          "text": "Whole orders only.",
+          "status": "open",
+          "blocking": false
+        }
+      ],
+      "questions": [
+        {
+          "id": "Q-001",
+          "key": {
+            "entity": "order",
+            "target_id": null,
+            "attribute": "refund method"
+          },
+          "status": "open",
+          "blocking": true
+        }
+      ],
+      "priority": null,
+      "tracker": [
+        "example/shop#7"
+      ],
+      "revision": [
+        {
+          "date": "2026-11-21",
+          "change": "First draft",
+          "reason": "Intake",
+          "source_ref": "example/shop#7"
+        }
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "type": "story",
+      "title": "Cancel an unshipped order",
+      "status": "draft",
+      "area": "orders",
+      "parent": "REQ-001",
+      "intent": {
+        "actor": "Customer",
+        "need": "Cancel an order before it ships",
+        "business_value": "Fewer support tickets",
+        "cites": [
+          "example/shop#7"
+        ]
+      },
+      "scope": {
+        "in": [
+          {
+            "text": "Cancelling a whole order",
+            "cites": [
+              "example/shop#7"
+            ]
+          }
+        ],
+        "out": [
+          {
+            "text": "Partial cancellation",
+            "cites": [
+              "A-001"
+            ]
+          }
+        ]
+      },
+      "acceptance_criteria": [
+        {
+          "id": "REQ-002/AC-001",
+          "key": {
+            "entity": "order",
+            "target_id": "cancel-order",
+            "attribute": "status"
+          },
+          "given": [
+            "A customer with an unshipped order"
+          ],
+          "when": "The customer cancels the order",
+          "then": [
+            "The order status is cancelled"
+          ],
+          "cites": [
+            "example/shop#7"
+          ],
+          "kind": "positive"
+        },
+        {
+          "id": "REQ-002/AC-002",
+          "key": {
+            "entity": "order",
+            "target_id": "cancel-order",
+            "attribute": "status"
+          },
+          "given": [
+            "A customer with an unshipped order"
+          ],
+          "when": "The customer cancels a shipped order",
+          "then": [
+            "The order status is cancelled"
+          ],
+          "cites": [
+            "example/shop#7"
+          ],
+          "kind": "negative"
+        }
+      ],
+      "rules": [],
+      "changes": [
+        {
+          "rule": "new",
+          "kind": "add",
+          "proposed_statement": "An order can be cancelled until it ships.",
+          "accepted_by": ""
+        }
+      ],
+      "quality": {
+        "none": "No quality target in the intake."
+      },
+      "permissions": [
+        {
+          "role": "customer",
+          "may": [
+            "cancel own order before shipping"
+          ],
+          "may_not": [
+            "cancel a shipped order"
+          ]
+        }
+      ],
+      "sources": [
+        "example/shop#7"
+      ],
+      "assumptions": [
+        {
+          "id": "A-001",
+          "key": {
+            "entity": "order",
+            "target_id": null,
+            "attribute": "partial cancellation"
+          },
+          "text": "Whole orders only.",
+          "status": "open",
+          "blocking": false
+        }
+      ],
+      "questions": [
+        {
+          "id": "Q-001",
+          "key": {
+            "entity": "order",
+            "target_id": null,
+            "attribute": "refund method"
+          },
+          "status": "open",
+          "blocking": true
+        }
+      ],
+      "priority": null,
+      "tracker": [
+        "example/shop#7"
+      ],
+      "revision": [
+        {
+          "date": "2026-11-21",
+          "change": "First draft",
+          "reason": "Intake",
+          "source_ref": "example/shop#7"
+        }
+      ]
+    },
+    {
+      "id": "REQ-003",
+      "type": "story",
+      "title": "Refund a cancelled order",
+      "status": "draft",
+      "area": "orders",
+      "parent": "REQ-001",
+      "intent": {
+        "actor": "Customer",
+        "need": "Cancel an order before it ships",
+        "business_value": "Fewer support tickets",
+        "cites": [
+          "example/shop#7"
+        ]
+      },
+      "scope": {
+        "in": [
+          {
+            "text": "Cancelling a whole order",
+            "cites": [
+              "example/shop#7"
+            ]
+          }
+        ],
+        "out": [
+          {
+            "text": "Partial cancellation",
+            "cites": [
+              "A-001"
+            ]
+          }
+        ]
+      },
+      "acceptance_criteria": [
+        {
+          "id": "REQ-003/AC-001",
+          "key": {
+            "entity": "order",
+            "target_id": "cancel-order",
+            "attribute": "status"
+          },
+          "given": [
+            "A customer with an unshipped order"
+          ],
+          "when": "The order ships in the same minute",
+          "then": [
+            "The order status is cancelled"
+          ],
+          "cites": [
+            "example/shop#7"
+          ],
+          "kind": "boundary"
+        }
+      ],
+      "rules": [],
+      "changes": [
+        {
+          "rule": "new",
+          "kind": "add",
+          "proposed_statement": "An order can be cancelled until it ships.",
+          "accepted_by": ""
+        }
+      ],
+      "quality": {
+        "none": "No quality target in the intake."
+      },
+      "permissions": [
+        {
+          "role": "customer",
+          "may": [
+            "cancel own order before shipping"
+          ],
+          "may_not": [
+            "cancel a shipped order"
+          ]
+        }
+      ],
+      "sources": [
+        "example/shop#7"
+      ],
+      "assumptions": [
+        {
+          "id": "A-001",
+          "key": {
+            "entity": "order",
+            "target_id": null,
+            "attribute": "partial cancellation"
+          },
+          "text": "Whole orders only.",
+          "status": "open",
+          "blocking": false
+        }
+      ],
+      "questions": [
+        {
+          "id": "Q-001",
+          "key": {
+            "entity": "order",
+            "target_id": null,
+            "attribute": "refund method"
+          },
+          "status": "open",
+          "blocking": true
+        }
+      ],
+      "priority": null,
+      "tracker": [
+        "example/shop#7"
+      ],
+      "revision": [
+        {
+          "date": "2026-11-21",
+          "change": "First draft",
+          "reason": "Intake",
+          "source_ref": "example/shop#7"
+        }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-001",
+      "key": {
+        "entity": "order",
+        "target_id": null,
+        "attribute": "refund method"
+      },
+      "blocks": [
+        "REQ-003/AC-001"
+      ],
+      "blocking": true,
+      "text": "Where does the refund go?",
+      "options": [
+        {
+          "id": "a",
+          "text": "Original payment method."
+        },
+        {
+          "id": "b",
+          "text": "Store credit."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A-001",
+      "key": {
+        "entity": "order",
+        "target_id": null,
+        "attribute": "partial cancellation"
+      },
+      "text": "Whole orders only.",
+      "blocking": false
+    }
+  ],
+  "answers_applied": [
+    {
+      "target": "REQ-002",
+      "field": "assumptions[A-002].status",
+      "comment_ref": "example/shop#7 comment 1001"
+    }
+  ],
+  "source_refs": [
+    "example/shop#7",
+    "example/shop#7 comment 1001"
+  ]
+}

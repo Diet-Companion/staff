@@ -1,0 +1,4 @@
+residency:
+  regions: unrestricted   # synthetic
+model_endpoint: anthropic-api
+testability: []

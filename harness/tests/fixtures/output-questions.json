@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "analyst",
+  "intake": {"ref": "example/shop#7", "area": "orders", "batch_number": 1, "is_kickoff": false},
+  "outcome": "questions",
+  "decision_summary": "Decide first: Q-001 (cancellation window) blocks every draft.\nThe intake asks for order cancellation; no active rule covers it.",
+  "requirements": [],
+  "questions": [
+    {
+      "id": "Q-001",
+      "key": {"entity": "order", "target_id": null, "attribute": "cancellation window"},
+      "blocks": ["REQ-001"],
+      "blocking": true,
+      "text": "How long after placing an order may a customer cancel it?",
+      "options": [
+        {"id": "a", "text": "Until it ships."},
+        {"id": "b", "text": "Within 24 hours."},
+        {"id": "c", "text": "Never; only support can cancel."}
+      ],
+      "recommended": "a",
+      "priority": 1
+    },
+    {
+      "id": "Q-002",
+      "key": {"entity": "order", "target_id": "cancel-order", "attribute": "refund method"},
+      "blocks": ["REQ-001/AC-002"],
+      "blocking": false,
+      "text": "Ping @someone and see [this](https://example.invalid/x.png) <b>now</b> #12 * not a list",
+      "options": [
+        {"id": "a", "text": "Original payment method."},
+        {"id": "b", "text": "Store credit."}
+      ],
+      "recommended": "b",
+      "priority": 2
+    }
+  ],
+  "assumptions": [
+    {"id": "A-001", "key": {"entity": "order", "target_id": null, "attribute": "partial cancellation"}, "text": "Whole orders only; overflow from the batch limit.", "blocking": false}
+  ],
+  "source_refs": ["example/shop#7", "knowledge/product-core.md"]
+}
