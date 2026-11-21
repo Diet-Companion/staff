@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Diet-Companion/staff/harness/schemas/run-log-entry.schema.json",
+  "title": "Outcome store entry, log version 1",
+  "description": "One line of the outcome store (S-GEN-029, S-GEN-031): an agent run record or a human verdict update. IDs, hashes, counts, fixed codes and URLs only. No field holds free text from the model, the tracker or the human (S-SEC-004), so every string is pattern-bound. Human-authored (S-GEN-025).",
+  "oneOf": [
+    { "$ref": "#/$defs/agent_run" },
+    { "$ref": "#/$defs/verdict_update" }
+  ],
+  "$defs": {
+    "agent_run": {
+      "description": "The run record that harness/run_record.py writes, unchanged, plus log_version and logged_at. A new run-record field must be added here first, or the append fails closed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["log_version", "logged_at", "record_kind", "run_id", "run_attempt", "identity", "plugin", "agent",
+                   "stage", "area", "status", "outcome", "validation", "read_schema_version", "plugin_versions",
+                   "model", "staff_sha", "product_sha", "trigger", "input_refs", "input_sha256", "output_refs",
+                   "comment_urls", "cost_usd", "num_turns", "duration_s", "created_at", "role"],
+      "properties": {
+        "log_version": { "const": 1 },
+        "logged_at": { "$ref": "#/$defs/timestamp" },
+        "record_kind": { "const": "agent_run" },
+        "run_id": { "$ref": "#/$defs/run_id" },
+        "run_attempt": { "type": "integer", "minimum": 1 },
+        "identity": { "$ref": "#/$defs/slug" },
+        "plugin": { "$ref": "#/$defs/slug" },
+        "agent": { "$ref": "#/$defs/agent" },
+        "stage": { "type": "integer", "minimum": 1, "maximum": 4 },
+        "area": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/slug" }] },
+        "status": {
+          "description": "S-GEN-029 run status.",
+          "enum": ["open", "completed", "timeout", "cap_hit", "crashed", "skipped_by_switch", "redaction_dropped"]
+        },
+        "outcome": { "$ref": "#/$defs/code" },
+        "validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ok", "reason"],
+          "properties": {
+            "ok": { "type": "boolean" },
+            "reason": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/code" }] }
+          }
+        },
+        "read_schema_version": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/version" }] },
+        "plugin_versions": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/slug" },
+          "additionalProperties": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/version" }] }
+        },
+        "model": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,99}$" },
+        "staff_sha": { "$ref": "#/$defs/sha" },
+        "product_sha": { "$ref": "#/$defs/sha" },
+        "trigger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "ref"],
+          "properties": {
+            "type": { "enum": ["label", "comment", "dispatch", "schedule", "pull_request", "push"] },
+            "ref": { "$ref": "#/$defs/issue_ref" }
+          }
+        },
+        "input_refs": { "type": "array", "items": { "$ref": "#/$defs/issue_ref" }, "maxItems": 50 },
+        "input_sha256": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[0-9a-f]{64}$" }] },
+        "output_refs": { "type": "array", "items": { "$ref": "#/$defs/url" }, "maxItems": 50 },
+        "comment_urls": { "type": "array", "items": { "$ref": "#/$defs/url" }, "maxItems": 50 },
+        "cost_usd": { "oneOf": [{ "type": "null" }, { "type": "number", "minimum": 0 }] },
+        "num_turns": { "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 0 }] },
+        "duration_s": { "oneOf": [{ "type": "null" }, { "type": "number", "minimum": 0 }] },
+        "created_at": { "$ref": "#/$defs/timestamp" },
+        "role": {
+          "description": "Role fields (S-GEN-029; BA: S-BA-039). Any key, but values are IDs, counts and flags only.",
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,39}$" },
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "boolean" },
+              { "type": "integer" },
+              { "$ref": "#/$defs/token" },
+              { "type": "array", "maxItems": 200, "items": { "oneOf": [{ "type": "integer" }, { "$ref": "#/$defs/token" }] } }
+            ]
+          }
+        }
+      }
+    },
+    "verdict_update": {
+      "description": "A human review of one run (S-GEN-071), with the self-logged review minutes (S-GEN-032). Written by harness/log_review.py. Any note the human adds after the command is dropped, never stored.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["log_version", "logged_at", "record_kind", "run_id", "target_ref", "human_verdict", "items",
+                   "review_minutes", "verdict_by", "verdict_at", "source"],
+      "properties": {
+        "log_version": { "const": 1 },
+        "logged_at": { "$ref": "#/$defs/timestamp" },
+        "record_kind": { "const": "verdict_update" },
+        "run_id": {
+          "description": "The reviewed run. null when no run on target_ref could be matched; the minutes still count.",
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/run_id" }]
+        },
+        "target_ref": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/issue_ref" }] },
+        "human_verdict": {
+          "description": "accepted: taken without changing structured fields, so confirmed (S-BA-042). edited: taken after changes. rejected: not taken. null: time logged with no verdict, e.g. answering a question batch.",
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/verdict" }]
+        },
+        "items": {
+          "description": "Optional verdicts per drafted item (S-BA-042: one verdict per draft), keyed by item ID.",
+          "type": "object",
+          "maxProperties": 50,
+          "propertyNames": { "pattern": "^[A-Z]{1,6}-[0-9]{3,}(/[A-Z]{1,6}-[0-9]{3,}){0,2}$" },
+          "additionalProperties": { "$ref": "#/$defs/verdict" }
+        },
+        "review_minutes": { "type": "number", "exclusiveMinimum": 0, "maximum": 480 },
+        "verdict_by": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$" },
+        "verdict_at": { "$ref": "#/$defs/timestamp" },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "ref"],
+          "properties": {
+            "type": { "enum": ["comment", "cli"] },
+            "ref": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/url" }] }
+          }
+        }
+      }
+    },
+    "verdict": { "enum": ["accepted", "edited", "rejected"] },
+    "run_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "agent": {
+      "description": "One eval unit (S-GEN-030), e.g. analyst or reviewer/requirements.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}(/[a-z0-9][a-z0-9-]{0,63})?$"
+    },
+    "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,39}$" },
+    "version": { "type": "string", "pattern": "^[0-9A-Za-z][0-9A-Za-z.+-]{0,31}$" },
+    "sha": { "type": "string", "pattern": "^([0-9a-f]{40}|unknown)$" },
+    "issue_ref": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}#[0-9]{1,10}$" },
+    "url": { "type": "string", "pattern": "^https://[A-Za-z0-9.-]{1,100}/[A-Za-z0-9._~/#?=&%:+-]{1,300}$" },
+    "timestamp": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+    "token": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_./:#-]{0,79}$" }
+  }
+}

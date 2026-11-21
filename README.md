@@ -39,13 +39,19 @@ staff/
     redact_check.py                    # fail-closed secret and email scan (S-SEC-004)
     render_comment.py                  # deterministic Markdown comments
     run_record.py                      # run record (S-GEN-029)
+    append_run_log.py                  # outcome store: append and export entries (S-GEN-029, S-GEN-031)
+    log_review.py                      # /review comments -> verdict and review-minutes entries (S-GEN-032, S-GEN-071)
+    report.py                          # daily and weekly summary: runs, cost, review minutes, verdicts
+    schemas/run-log-entry.schema.json  # outcome-store entry schema
     contract.py                        # operators.yml, areas.yml, product.yml readers
     tests/                             # unittest; run by .github/workflows/harness-tests.yml
   governance/
     guardrails.md                      # G1-G12 and how each is enforced
     product-contract.md                # what a product repo must contain
     operators.yml                      # the human's accounts, for actor checks
-  docs/strategy/                       # copy of the approved strategy and decisions log
+  docs/
+    measurement.md                     # what is recorded, the outcome store, /review, the report, workflow snippets
+    strategy/                          # copy of the approved strategy and decisions log
   CODEOWNERS                           # the human owns every path
 ```
 
@@ -94,6 +100,8 @@ The full target layout (more plugins, `evals/`, `metrics/`, `ops/`, `experiments
    ```
 
    `claude --agent staff-product:analyst` is not used headlessly. In Claude Code 2.1.329 a main-session agent gets no `skills:` preload, and its `tools:` list also removes the tool that `--json-schema` needs. See `harness/prepare_agent.py`. Feed the validated JSON, never the raw ticket, to a separate comment-only step (S-SEC-002).
+
+5. Record runs and reviews in the outcome store and read the report: see [`docs/measurement.md`](docs/measurement.md).
 
 ## Changing this repo
 

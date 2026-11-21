@@ -1,7 +1,8 @@
 """Build the Analyst read-stage input file from a GitHub issue event.
 
 Keeps the issue title and body, comments by operators (governance/operators.yml,
-S-BA-015) and the Analyst App's own earlier comments. Drops every other comment.
+S-BA-015) and the Analyst App's own earlier comments. Drops every other comment,
+and the operator's `/analyst` and `/review` command comments.
 All tracker text goes under `untrusted` and is marked as data, never
 instructions (S-SEC-001). Fails closed if the result exceeds --max-bytes.
 
@@ -26,6 +27,7 @@ COMMENT_KINDS = {
     "analyst_app": "An earlier comment by the Analyst write stage: your earlier question batches and drafts.",
 }
 COMMAND = "/analyst"
+REVIEW_COMMAND = "/review"
 DEFAULT_MAX_BYTES = 100_000
 
 
@@ -43,8 +45,9 @@ def classify(comment, operators, bot_login):
     user = comment.get("user") or {}
     login, kind = str(user.get("login", "")), user.get("type")
     if kind == "User" and login.lower() in operators:
-        if (comment.get("body") or "").strip() == COMMAND:
-            return None  # a run command, not intake content
+        body = (comment.get("body") or "").strip()
+        if body == COMMAND or body.split("\n", 1)[0].split(" ", 1)[0] == REVIEW_COMMAND:
+            return None  # a run command or a review log line (log_review.py), not intake content
         return "operator"
     if kind == "Bot" and login == bot_login:
         return "analyst_app"

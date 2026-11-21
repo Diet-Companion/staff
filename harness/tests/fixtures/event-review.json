@@ -1,0 +1,26 @@
+{
+  "action": "created",
+  "repository": {
+    "full_name": "example/shop"
+  },
+  "issue": {
+    "number": 7,
+    "title": "Order export",
+    "labels": [{"name": "ba:intake"}]
+  },
+  "comment": {
+    "id": 9101,
+    "html_url": "https://github.com/example/shop/issues/7#issuecomment-9101",
+    "user": {
+      "login": "Test-Operator",
+      "type": "User"
+    },
+    "created_at": "2026-11-17T12:30:00Z",
+    "updated_at": "2026-11-17T12:30:00Z",
+    "body": "/review 1h5m REQ-002=edited REQ-001=accepted\r\nNote for me only: test@example.com, never stored."
+  },
+  "sender": {
+    "login": "Test-Operator",
+    "type": "User"
+  }
+}
