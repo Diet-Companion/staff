@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "dev-upkeep",
+  "decision_summary": "No new report items for the area. No change.",
+  "pr": null,
+  "proposed_files": [],
+  "tool_runs": [],
+  "residual_edits": [],
+  "dependencies": [],
+  "handoffs": [],
+  "source_refs": [
+    "ci/lint-report#13"
+  ]
+}

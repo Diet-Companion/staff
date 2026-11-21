@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "developer",
+  "decision_summary": "Decide first: defect item on REQ-012/AC-004 (contradicts R-004). No code until the requirement is ready again.",
+  "pr": null,
+  "proposed_files": [],
+  "classification": {
+    "kind": "requirement_defect",
+    "defect": {
+      "target": "REQ-012/AC-004",
+      "expected": "Cancel allowed after shipping.",
+      "actual": "Cancel refused after shipping.",
+      "evidence_refs": [
+        "example/shop#31"
+      ]
+    },
+    "drafted": [],
+    "cites": [
+      "REQ-012/AC-004",
+      "R-004"
+    ],
+    "note": "The AC contradicts an active rule."
+  },
+  "defect_items": [
+    {
+      "target": "REQ-012/AC-004",
+      "kind": "contradicts",
+      "evidence_refs": [
+        "R-004",
+        "REQ-012/AC-004"
+      ],
+      "text": "AC-004 allows cancelling a shipped order; R-004 forbids it."
+    }
+  ],
+  "design_requests": [],
+  "questions": [
+    {
+      "id": "Q-001",
+      "key": {
+        "entity": "order",
+        "target_id": "cancel-order",
+        "attribute": "retry policy"
+      },
+      "blocks": [
+        "REQ-012/AC-005"
+      ],
+      "blocking": true,
+      "text": "Should a failed cancel be retried automatically?",
+      "options": [
+        {
+          "id": "a",
+          "text": "No retry."
+        },
+        {
+          "id": "b",
+          "text": "Retry once."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A-001",
+      "key": {
+        "entity": "order",
+        "target_id": null,
+        "attribute": "shipped state"
+      },
+      "text": "shipped_at is set when the carrier confirms pickup.",
+      "blocking": false
+    }
+  ],
+  "private_reports": [
+    {
+      "id": "SR-001",
+      "kind": "exposed_secret",
+      "location": "src/orders/config.py:3",
+      "text": "A credential-like literal; value withheld."
+    }
+  ],
+  "code_map": null,
+  "source_refs": [
+    "example/shop#31",
+    "knowledge/rules/orders/R-004.md"
+  ]
+}
