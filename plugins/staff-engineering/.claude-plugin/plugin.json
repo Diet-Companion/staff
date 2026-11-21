@@ -1,0 +1,6 @@
+{
+  "name": "staff-engineering",
+  "version": "0.1.0",
+  "description": "Architect, developer and DevOps agents (S-GEN-014). Built at stage 1, read stage only; no workflow runs them yet.",
+  "dependencies": ["staff-core"]
+}

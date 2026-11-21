@@ -16,6 +16,12 @@
       "source": "./plugins/staff-product",
       "description": "Business-analyst agents. Lean slice: the Analyst read stage at stage 1.",
       "version": "0.1.0"
+    },
+    {
+      "name": "staff-engineering",
+      "source": "./plugins/staff-engineering",
+      "description": "Architect, developer and DevOps agents. Built at stage 1; not wired to any workflow yet.",
+      "version": "0.1.0"
     }
   ]
 }
