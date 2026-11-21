@@ -1,0 +1,8 @@
+# Human operator accounts (S-GEN-071).
+# Only events whose actor is listed here count as human answers, verdicts,
+# labels or dispatches (S-BA-015, S-BA-034, S-DEVOPS-017). Every other actor's
+# events are input data or are dropped.
+# Human-authored only (S-GEN-025). Account handles only: no emails, names or other personal data.
+version: 1
+operators:
+  - github: giokur

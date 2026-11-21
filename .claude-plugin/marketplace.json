@@ -1,0 +1,21 @@
+{
+  "name": "staff",
+  "owner": {
+    "name": "giokur"
+  },
+  "description": "Product-agnostic agent staff, packaged as Claude Code plugins. Install pinned release tags only (S-GEN-016).",
+  "plugins": [
+    {
+      "name": "staff-core",
+      "source": "./plugins/staff-core",
+      "description": "Shared rules and guardrails every staff agent loads.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "staff-product",
+      "source": "./plugins/staff-product",
+      "description": "Business-analyst agents. Lean slice: the Analyst read stage at stage 1.",
+      "version": "0.1.0"
+    }
+  ]
+}

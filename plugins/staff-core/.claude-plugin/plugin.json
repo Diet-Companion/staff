@@ -1,0 +1,5 @@
+{
+  "name": "staff-core",
+  "version": "0.1.0",
+  "description": "Shared rules for every staff agent: the always-loaded strategy-shared skill (untrusted input, two-stage split, redaction, no production or personal data, guardrails G1-G12, citation conventions). Later: two-stage harness, run-record emitter, contract reader."
+}

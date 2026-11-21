@@ -1,0 +1,6 @@
+{
+  "name": "staff-product",
+  "version": "0.1.0",
+  "description": "Business-analyst agents. Lean slice: the Analyst read stage at stage 1, with the requirements and elicitation skills and the analyst-output read-stage schema.",
+  "dependencies": ["staff-core"]
+}
