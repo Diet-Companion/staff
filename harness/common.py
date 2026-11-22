@@ -12,7 +12,7 @@ import sys
 REASONS = {
     # contract and input (build_input.py, contract.py, redact_check.py)
     "contract_invalid", "not_operator", "input_fetch_failed", "input_invalid",
-    "input_too_large", "input_redaction",
+    "input_too_large", "input_redaction", "nothing_to_review",
     # agent preparation (prepare_agent.py)
     "agent_invalid",
     # model run (workflow)
@@ -22,6 +22,9 @@ REASONS = {
     "model_error", "no_output", "output_not_json", "schema_invalid",
     "multiple_epics", "parent_mismatch", "blocking_order", "duplicate_id",
     "ac_id_mismatch", "recommended_not_option", "unknown_area", "stage_violation",
+    # reviewer output (validate_output.py --agent reviewer)
+    "type_mismatch", "target_mismatch", "sha_mismatch", "finding_id_invalid", "severity_order",
+    "unknown_finding",
     # redaction of the output (redact_check.py, check_transcript.py)
     "redaction_hit",
     # interview transcripts (check_transcript.py)

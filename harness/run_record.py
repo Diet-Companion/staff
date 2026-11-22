@@ -40,9 +40,26 @@ def plugin_versions(plugins_root):
 
 
 def role_fields(validated):
-    """BA role fields (S-BA-039) from the validated output; IDs and counts only."""
+    """Role fields from the validated output; IDs, counts and fixed codes only.
+
+    Analyst: the BA fields (S-BA-039). Reviewer: the readiness verdict and the
+    finding IDs with their classifications (S-BA-032), as the gate check reads them.
+    """
     if not validated:
         return {}
+    if validated.get("agent") == "reviewer":
+        return {
+            "artifact_type": validated["artifact_type"],
+            "target_ref": validated["target"]["ref"],
+            "reviewed_sha": validated["reviewed_sha"],
+            "readiness_verdict": validated["verdict"],
+            "findings": [{"id": f["finding_id"], "severity": f["severity"],
+                          "classification": f["classification"]} for f in validated["findings"]],
+            "question_ids": [q["id"] for q in validated["questions"]],
+            "blocking_questions": sum(1 for q in validated["questions"] if q["blocking"]),
+            "proposed_changes": len(validated.get("proposed_changes", [])),
+            "test_conditions": len(validated.get("test_conditions", [])),
+        }
     reqs = validated["requirements"]
     return {
         "req_ids": [r["id"] for r in reqs],
@@ -70,9 +87,9 @@ def build(args):
         "plugin": args.plugin,
         "agent": args.agent,
         "stage": args.stage,
-        "area": validated["intake"]["area"] if validated else None,
+        "area": validated["intake"]["area"] if validated and "intake" in validated else None,
         "status": "completed" if ok else STATUS_BY_REASON.get(reason, "crashed"),
-        "outcome": validated["outcome"] if ok else "failed",
+        "outcome": (validated.get("outcome") or validated.get("verdict")) if ok else "failed",
         "validation": {"ok": ok, "reason": None if ok else (reason or "read_job_failed")},
         "read_schema_version": validated["schema_version"] if validated else None,
         "plugin_versions": plugin_versions(args.plugins_root) if args.plugins_root else {},
@@ -113,7 +130,7 @@ def main():
     w.add_argument("--model", required=True)
     w.add_argument("--staff-sha", required=True)
     w.add_argument("--product-sha", required=True)
-    w.add_argument("--trigger-type", required=True, choices=["label", "comment"])
+    w.add_argument("--trigger-type", required=True, choices=["label", "comment", "pull_request"])
     w.add_argument("--trigger-ref", required=True)
     w.add_argument("--input", help="the input file, hashed")
     w.add_argument("--result", help="validate_output.py result file")
