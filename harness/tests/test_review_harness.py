@@ -13,6 +13,7 @@ from helpers import FIXTURES, STAFF, run_cli
 from build_review_input import MAX_PATCH_CHARS, build
 from common import HarnessError
 from prepare_agent import build_prompt, cli_schema
+from redact_check import scan
 from render_review import BLOCK_TAG, labels, render_review
 from run_record import role_fields
 from validate_output import check_review
@@ -109,8 +110,16 @@ class BuildReviewInputTest(unittest.TestCase):
         self.assertEqual(data["reviewed_sha"], HEAD)
         self.assertEqual([f["path"] for f in data["files"]],
                          ["requirements/catalog/REQ-002.md", "requirements/catalog/REQ-099.md"])
-        self.assertEqual(data["files"][0]["head_path"], "/w/head/requirements/catalog/REQ-002.md")
-        self.assertIsNone(data["files"][1]["head_path"])
+        self.assertEqual(data["head_dir"], "/w/head")
+        self.assertEqual([f["in_head"] for f in data["files"]], [True, False])
+
+    def test_ci_paths_pass_redaction(self):
+        # A long absolute path trips the entropy check, so only head_dir is absolute.
+        ci = "/home/runner/work/diet-companion/diet-companion/head"
+        data = build(pr(), FILES, COMMENTS, repo=REPO, head_sha=HEAD, head_dir=ci,
+                     artifact_type="requirements", operators=OPERATORS, areas=["catalog"],
+                     bot_login=BOT, run_id="123-1", trigger="comment")
+        self.assertEqual(scan(data), [])
         self.assertEqual(data["out_of_scope_files"], ["docs/staff/analyst.md"])
         kinds = [(c["ref"].rsplit(" ", 1)[1], c["author_kind"]) for c in data["untrusted"]["comments"]]
         self.assertEqual(kinds, [("1", "operator"), ("3", "reviewer_app")])

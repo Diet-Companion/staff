@@ -13,7 +13,6 @@ tests pass --pr-file, --files-file and --comments-file instead.
 """
 import argparse
 import json
-import os
 import subprocess
 
 from common import HarnessError, load_json, run_main
@@ -82,14 +81,15 @@ def build(pr, files, comments, *, repo, head_sha, head_dir, artifact_type, opera
         if not in_scope(path, artifact_type):
             out_of_scope.append(path)
             continue
-        present = f.get("status") != "removed"
         listed.append({
             "path": path,
             "status": f.get("status"),
             "previous_path": f.get("previous_filename"),
             "additions": f.get("additions"),
             "deletions": f.get("deletions"),
-            "head_path": os.path.join(head_dir, path) if present else None,
+            # Read it at <head_dir>/<path>. Absolute per-file paths are left out: a long path
+            # looks like a key to the redaction check (S-SEC-004).
+            "in_head": f.get("status") != "removed",
         })
         patch = f.get("patch")
         if patch is not None:
