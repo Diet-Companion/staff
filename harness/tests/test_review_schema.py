@@ -1,9 +1,8 @@
 """staff-review: review-output schema, reviewer prompt and per-type pack budget.
 
 The reviewer agent file preloads only staff-core:strategy-shared. The harness adds
-one checklist skill per run (S-GEN-030). prepare_agent.py has no `--skill` yet,
-so `review_prompt` below builds the prompt the way that option would: the agent
-body, its front-matter skills, the checklist skill, then the harness contract.
+one checklist skill per run (S-GEN-030) with prepare_agent.py `--skill`: the agent
+body, its front-matter skills, the checklist skill, then the reviewer contract.
 """
 import copy
 import glob
@@ -16,7 +15,7 @@ from jsonschema import Draft7Validator, Draft202012Validator
 
 from helpers import FIXTURES, STAFF
 
-from prepare_agent import HARNESS_CONTRACT, build_prompt, cli_schema, split_front_matter
+from prepare_agent import REVIEWER_CONTRACT, build_prompt, cli_schema, split_front_matter
 
 PLUGINS = os.path.join(STAFF, "plugins")
 REVIEW = os.path.join(PLUGINS, "staff-review")
@@ -49,20 +48,10 @@ def load_json(path):
         return json.load(fh)
 
 
-def skill_section(skill):
-    plugin, _, name = skill.partition(":")
-    _, body = split_front_matter(os.path.join(PLUGINS, plugin, "skills", name, "SKILL.md"))
-    return f"# Preloaded skill `{skill}`\n\n{body}"
-
-
 def review_prompt(artifact_type, extra_skills=()):
-    """The reviewer prompt with one checklist skill, as `--skill` would build it."""
-    prompt, tools = build_prompt(AGENT, PLUGINS)
-    added = [skill_section(f"staff-review:review-{artifact_type}")]
-    added += [skill_section(s) for s in extra_skills]
-    head, sep, tail = prompt.rpartition(HARNESS_CONTRACT)
-    assert sep, "harness contract not found"
-    return head + "\n\n".join(added) + "\n\n" + sep + tail, tools
+    """The reviewer prompt with one checklist skill, as the workflow builds it."""
+    skills = [f"staff-review:review-{artifact_type}", *extra_skills]
+    return build_prompt(AGENT, PLUGINS, skills, contract="reviewer")
 
 
 class ReviewSchemaTest(unittest.TestCase):
