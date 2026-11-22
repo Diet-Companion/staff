@@ -57,6 +57,8 @@ REVIEWER_CONTRACT = """\
 - **Repo.** Your working directory is the product repo at the PR's base, read-only. It
   is truth: merged rules, ready requirements, the product core. The head directory
   holds candidates only (S-BA-022). Review the changed files there.
+- **Refs.** Cite files by repo-relative path, never absolute: `head:requirements/<area>/REQ-n.md:L12`
+  for the PR's version of a file, `knowledge/rules/<area>/R-n.md` for the base.
 - **Output.** Return your one JSON object by calling the StructuredOutput tool exactly
   once. Write nothing else. The harness validates it and rejects anything else
   (S-SEC-003).
