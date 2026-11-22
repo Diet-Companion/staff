@@ -13,7 +13,7 @@ Only one agent runs: the business-analyst **Analyst**, at **stage 1 (advisory)**
 - It reads an intake ticket and the product repo with read-only tools (`Read`, `Glob`, `Grep`).
 - It returns JSON only, validated against [`analyst-output.schema.json`](plugins/staff-product/schemas/analyst-output.schema.json): a question batch, up to 5 draft requirements with acceptance criteria, a kickoff interview guide, or an escalation.
 - A separate write step posts that output as comments on the ticket. The Analyst never commits, opens PRs, labels or merges.
-- Everything else is manual: the human starts runs, gives verdicts, writes rules and the product core, commits accepted drafts, and runs any interview.
+- Everything else is manual: the human starts runs, gives verdicts, writes rules and the product core, commits accepted drafts, and runs any interview (see [`docs/interview-kickoff.md`](docs/interview-kickoff.md)).
 
 [`governance/guardrails.md`](governance/guardrails.md) shows which guardrail enforcement exists in the lean slice and which comes later.
 
@@ -21,7 +21,7 @@ Only one agent runs: the business-analyst **Analyst**, at **stage 1 (advisory)**
 
 ```
 staff/
-  .claude-plugin/marketplace.json      # plugin marketplace: staff-core, staff-product
+  .claude-plugin/marketplace.json      # plugin marketplace: staff-core, staff-product, staff-review
   plugins/
     staff-core/
       .claude-plugin/plugin.json
@@ -29,22 +29,34 @@ staff/
     staff-product/                     # business analyst
       .claude-plugin/plugin.json
       agents/analyst.md                # Analyst read stage (stage 1)
+      agents/analyst-interview.md      # tool-less live kickoff interviewer, human-launched (S-BA-055)
       skills/requirements/SKILL.md     # requirement, AC and rule model, IDs, paths
       skills/elicitation/SKILL.md      # question batches, stage-1 output
+      skills/analyst-interview/SKILL.md  # interviewer rules, INT-n format (S-BA-055 to S-BA-057)
+      templates/INT-n.md               # interview transcript template (S-BA-056)
       schemas/analyst-output.schema.json
+    staff-review/                      # shared reviewer, advisory (S-GEN-013, S-GEN-014)
+      .claude-plugin/plugin.json
+      agents/reviewer.md               # reviewer read stage; one artifact type per run
+      skills/review-<type>/SKILL.md    # one checklist per type; only requirements is wired
+      schemas/review-output.schema.json
   harness/                             # read/write-stage harness for headless runs (Python 3.12)
     build_input.py                     # issue + operator comments -> untrusted input file
+    build_review_input.py              # PR + changed files + comments -> reviewer input file
     prepare_agent.py                   # agent + preloaded skills -> system prompt; CLI schema
-    validate_output.py                 # envelope, cost, schema and harness checks
+    validate_output.py                 # envelope, cost, schema and harness checks (analyst, reviewer)
     redact_check.py                    # fail-closed secret and email scan (S-SEC-004)
-    render_comment.py                  # deterministic Markdown comments
+    render_comment.py                  # deterministic Markdown comments (Analyst)
+    render_review.py                   # one review comment, labels, machine-readable block
     run_record.py                      # run record (S-GEN-029)
     contract.py                        # operators.yml, areas.yml, product.yml readers
+    check_transcript.py                # INT-n transcript lint, run by the human before commit
     tests/                             # unittest; run by .github/workflows/harness-tests.yml
   governance/
     guardrails.md                      # G1-G12 and how each is enforced
     product-contract.md                # what a product repo must contain
     operators.yml                      # the human's accounts, for actor checks
+  docs/interview-kickoff.md            # operator how-to: run a kickoff interview, commit INT-n
   docs/strategy/                       # copy of the approved strategy and decisions log
   CODEOWNERS                           # the human owns every path
 ```
@@ -94,6 +106,21 @@ The full target layout (more plugins, `evals/`, `metrics/`, `ops/`, `experiments
    ```
 
    `claude --agent staff-product:analyst` is not used headlessly. In Claude Code 2.1.329 a main-session agent gets no `skills:` preload, and its `tools:` list also removes the tool that `--json-schema` needs. See `harness/prepare_agent.py`. Feed the validated JSON, never the raw ticket, to a separate comment-only step (S-SEC-002).
+
+5. Run the shared reviewer the same way, for a PR that touches `requirements/**` (for example `diet-companion`'s `.github/workflows/staff-review.yml`). Check the PR head out into its own directory, build the input from the PR, and preload the checklist for the type:
+
+   ```sh
+   python harness/build_review_input.py --repo <owner/name> --pr <n> --head-sha <sha> \
+     --head-dir <head dir> --artifact-type requirements --operators governance/operators.yml \
+     --areas <product>/.staff/areas.yml --bot-login <reviewer app>[bot] --run-id <id> \
+     --trigger comment --out <input dir>/input.json
+   python harness/prepare_agent.py --agent plugins/staff-review/agents/reviewer.md \
+     --skill staff-review:review-requirements --contract reviewer --artifact-type requirements \
+     --plugins-root plugins --schema plugins/staff-review/schemas/review-output.schema.json \
+     --out-prompt system-prompt.md --out-schema cli-schema.json
+   ```
+
+   Then run `claude -p` from the base checkout with `--add-dir` for the input and head directories, validate with `validate_output.py --agent reviewer --input <input dir>/input.json`, and post `render_review.py`'s one comment and labels from a separate step that holds the reviewer App's token.
 
 ## Changing this repo
 
