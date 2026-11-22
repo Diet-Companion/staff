@@ -48,6 +48,7 @@ staff/
     redact_check.py                    # fail-closed secret and email scan (S-SEC-004)
     render_comment.py                  # deterministic Markdown comments (Analyst)
     render_review.py                   # one review comment, labels, machine-readable block
+    ready_gate.py                      # ready-gate (S-BA-017) and lifecycle (S-BA-009) check, no model
     run_record.py                      # run record (S-GEN-029)
     contract.py                        # operators.yml, areas.yml, product.yml readers
     check_transcript.py                # INT-n transcript lint, run by the human before commit
