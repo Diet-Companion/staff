@@ -16,7 +16,7 @@ from prepare_agent import build_prompt, cli_schema
 from redact_check import scan
 from render_review import BLOCK_TAG, labels, render_review
 from run_record import role_fields
-from validate_output import check_review, sort_findings
+from validate_output import check_review, parse_prefixes, relativize, sort_findings
 
 PLUGINS = os.path.join(STAFF, "plugins")
 AGENT = os.path.join(PLUGINS, "staff-review", "agents", "reviewer.md")
@@ -208,6 +208,25 @@ class CheckReviewTest(unittest.TestCase):
         self.assertEqual([f["finding_id"] for f in doc["findings"]],
                          [blocker["finding_id"], major["finding_id"], major2["finding_id"], minor["finding_id"]])
         self.assertFalse(sort_findings(doc))
+
+    def test_relativize_absolute_checkout_paths(self):
+        ws = "/home/runner/work/diet-companion/diet-companion/"
+        doc = review_fixture()
+        doc["findings"][0]["evidence_refs"] = [ws + "head/requirements/catalog/REQ-003.md:L70",
+                                               ws + "product/knowledge/rules/catalog/R-002.md"]
+        doc["findings"][0]["text"] = "See " + ws + "head/requirements/catalog/REQ-003.md for details."
+        self.assertNotEqual(scan(doc), [])
+        n = relativize(doc, parse_prefixes([ws + "product/=", ws + "head/=head:"]))
+        self.assertEqual(n, 3)
+        self.assertEqual(doc["findings"][0]["evidence_refs"],
+                         ["head:requirements/catalog/REQ-003.md:L70", "knowledge/rules/catalog/R-002.md"])
+        self.assertEqual(scan(doc), [])
+        self.check(doc)
+
+    def test_strip_prefix_format(self):
+        for bad in ["relative/=x", "/no-trailing-slash=x", "/no-equals/"]:
+            with self.subTest(bad), self.assertRaises(HarnessError):
+                parse_prefixes([bad])
 
     def test_proposed_change_needs_its_finding(self):
         doc = review_fixture()

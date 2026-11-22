@@ -157,6 +157,46 @@ def sort_findings(out):
     return [f["finding_id"] for f in out["findings"]] != before
 
 
+def relativize(node, prefixes):
+    """Rewrite known checkout prefixes in every string, in place: `/…/head/x` -> `head:x`.
+
+    The reviewer reads files by absolute path, and sometimes cites them that way. A long
+    absolute path trips the redaction check's entropy rule (live run 45032670952), and
+    it says nothing the repo-relative path doesn't. Returns the number of rewrites.
+    """
+    count = 0
+
+    def fix(s):
+        nonlocal count
+        for prefix, repl in prefixes:
+            if prefix in s:
+                count += s.count(prefix)
+                s = s.replace(prefix, repl)
+        return s
+
+    def walk(n):
+        items = n.items() if isinstance(n, dict) else enumerate(n) if isinstance(n, list) else ()
+        for k, v in list(items):
+            if isinstance(v, str):
+                n[k] = fix(v)
+            else:
+                walk(v)
+
+    walk(node)
+    return count
+
+
+def parse_prefixes(values):
+    out = []
+    for v in values:
+        prefix, sep, repl = v.partition("=")
+        if not sep or not prefix.startswith("/") or not prefix.endswith("/"):
+            raise HarnessError("input_invalid", "--strip-prefix must be /absolute/dir/=replacement")
+        out.append((prefix, repl))
+    # Longest first, so a nested checkout is rewritten before its parent.
+    return sorted(out, key=lambda p: -len(p[0]))
+
+
 def check_review(out, expect_type, expect_target, expect_sha):
     """Reviewer checks JSON Schema can't express. Raises on the first failing check."""
     if out["artifact_type"] != expect_type:
@@ -206,6 +246,8 @@ def main():
     ap.add_argument("--agent", choices=["analyst", "reviewer"], default="analyst")
     ap.add_argument("--areas", help="product .staff/areas.yml (analyst)")
     ap.add_argument("--input", help="the review input file, for the expected type, target and commit (reviewer)")
+    ap.add_argument("--strip-prefix", action="append", default=[], metavar="/DIR/=REPL",
+                    help="rewrite an absolute checkout prefix in the output, e.g. /w/head/=head: (reviewer)")
     ap.add_argument("--max-run-usd", type=float, required=True)
     ap.add_argument("--stage", type=int, default=1)
     ap.add_argument("--out", required=True, help="validated output, written only on success")
@@ -226,6 +268,7 @@ def main():
             expect = load_json(args.input, "input_invalid")
             check_review(out, expect["artifact_type"], expect["target"]["ref"], expect["reviewed_sha"])
             result["findings_reordered"] = sort_findings(out)
+            result["paths_relativized"] = relativize(out, parse_prefixes(args.strip_prefix))
         else:
             if not args.areas:
                 raise HarnessError("input_invalid", "--areas is required with --agent analyst")
