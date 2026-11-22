@@ -39,6 +39,17 @@ class PrepareAgentTest(unittest.TestCase):
         self.assertEqual(cli["required"], full["required"])
         self.assertEqual(cli["$defs"]["text"], full["$defs"]["text"])
 
+    def test_cli_schema_has_no_top_level_combinators(self):
+        # The API rejects allOf/anyOf/oneOf at the top level of a tool input schema
+        # (live run 44932111796). The full schema keeps them for validate_output.py.
+        full = load(os.path.relpath(SCHEMA, os.path.join(STAFF, "harness", "tests", "fixtures")))
+        self.assertIn("allOf", full)
+        cli = cli_schema(full)
+        for kw in ("allOf", "anyOf", "oneOf", "if", "then", "else", "not"):
+            self.assertNotIn(kw, cli)
+        self.assertEqual(cli["properties"].keys(), full["properties"].keys())
+        self.assertEqual(cli["type"], "object")
+
 
 if __name__ == "__main__":
     unittest.main()
