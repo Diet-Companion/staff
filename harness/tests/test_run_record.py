@@ -1,5 +1,6 @@
 import json
 import os
+import pathlib
 import tempfile
 import unittest
 
@@ -31,7 +32,10 @@ class RunRecordTest(unittest.TestCase):
                                                                              {"ok": True, "reason": None}))
         self.assertEqual(len(rec["input_sha256"]), 64)
         self.assertEqual((rec["cost_usd"], rec["num_turns"], rec["duration_s"]), (0.4, 6, 42.0))
-        self.assertEqual(rec["plugin_versions"], {"staff-core": "0.1.0", "staff-product": "0.1.0"})
+        manifests = pathlib.Path(STAFF, "plugins").glob("*/.claude-plugin/plugin.json")
+        expected = {m["name"]: m["version"] for m in (json.loads(f.read_text()) for f in manifests)}
+        self.assertEqual(rec["plugin_versions"], expected)
+        self.assertIn("staff-product", expected)
         self.assertEqual(rec["role"]["req_ids"], ["REQ-001", "REQ-002", "REQ-003"])
         self.assertEqual(rec["role"]["rule_ids_changed"], ["new"])
         self.assertEqual((rec["staff_sha"], rec["product_sha"], rec["model"]), ("a" * 40, "b" * 40, "claude-sonnet-5-5"))

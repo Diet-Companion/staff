@@ -16,6 +16,12 @@
       "source": "./plugins/staff-product",
       "description": "Business-analyst agents. Lean slice: the Analyst read stage at stage 1.",
       "version": "0.1.0"
+    },
+    {
+      "name": "staff-review",
+      "source": "./plugins/staff-review",
+      "description": "Shared reviewer with one checklist skill per artifact type. Built; not wired to any workflow yet.",
+      "version": "0.1.0"
     }
   ]
 }

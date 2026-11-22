@@ -1,0 +1,6 @@
+{
+  "name": "staff-review",
+  "version": "0.1.0",
+  "description": "Shared reviewer (S-GEN-013). One read-only reviewer agent, run once per artifact type with that type's checklist skill: requirements, architecture, code, tests and pipeline. Provides the review-output read-stage schema. Advisory at every stage.",
+  "dependencies": ["staff-core"]
+}
