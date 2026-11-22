@@ -1,10 +1,14 @@
-"""Validate the Analyst read-stage output (S-SEC-002, S-SEC-003).
+"""Validate an agent's read-stage output (S-SEC-002, S-SEC-003).
 
 Reads the `claude -p --output-format json` envelope, checks the run's cost and
 status, extracts the structured result, validates it against the full
 analyst-output schema, and runs the checks JSON Schema can't express. Writes the
 validated JSON only when everything passes, and always writes a result file for
 the run record. Messages name JSON paths and check names, never model text.
+
+`--agent analyst` (the default) checks Analyst output. `--agent reviewer` checks the
+shared reviewer's output against what the harness chose: the artifact type, the
+target and the reviewed commit must match the input (S-BA-017 item 5).
 """
 import argparse
 import json
@@ -139,11 +143,111 @@ def check_harness(out, areas, stage):
                 raise HarnessError("stage_violation", f"/requirements/{i}/status is not draft at stage 1")
 
 
+SEVERITY_RANK = {"blocker": 0, "major": 1, "minor": 2}
+
+
+def sort_findings(out):
+    """Order findings blocker first (S-BA-032), keeping the model's order within a severity.
+
+    Ordering is presentation, not content, so the harness fixes it instead of failing
+    the run (live run 45031393545). Returns True when the order changed.
+    """
+    before = [f["finding_id"] for f in out["findings"]]
+    out["findings"].sort(key=lambda f: SEVERITY_RANK[f["severity"]])
+    return [f["finding_id"] for f in out["findings"]] != before
+
+
+def relativize(node, prefixes):
+    """Rewrite known checkout prefixes in every string, in place: `/…/head/x` -> `head:x`.
+
+    The reviewer reads files by absolute path, and sometimes cites them that way. A long
+    absolute path trips the redaction check's entropy rule (live run 45032670952), and
+    it says nothing the repo-relative path doesn't. Returns the number of rewrites.
+    """
+    count = 0
+
+    def fix(s):
+        nonlocal count
+        for prefix, repl in prefixes:
+            if prefix in s:
+                count += s.count(prefix)
+                s = s.replace(prefix, repl)
+        return s
+
+    def walk(n):
+        items = n.items() if isinstance(n, dict) else enumerate(n) if isinstance(n, list) else ()
+        for k, v in list(items):
+            if isinstance(v, str):
+                n[k] = fix(v)
+            else:
+                walk(v)
+
+    walk(node)
+    return count
+
+
+def parse_prefixes(values):
+    out = []
+    for v in values:
+        prefix, sep, repl = v.partition("=")
+        if not sep or not prefix.startswith("/") or not prefix.endswith("/"):
+            raise HarnessError("input_invalid", "--strip-prefix must be /absolute/dir/=replacement")
+        out.append((prefix, repl))
+    # Longest first, so a nested checkout is rewritten before its parent.
+    return sorted(out, key=lambda p: -len(p[0]))
+
+
+def check_review(out, expect_type, expect_target, expect_sha):
+    """Reviewer checks JSON Schema can't express. Raises on the first failing check."""
+    if out["artifact_type"] != expect_type:
+        raise HarnessError("type_mismatch", "/artifact_type is not the type the harness chose")
+    if out["target"] != {"kind": "pull_request", "ref": expect_target}:
+        raise HarnessError("target_mismatch", "/target is not the pull request under review")
+    if out["reviewed_sha"] != expect_sha:
+        raise HarnessError("sha_mismatch", "/reviewed_sha is not the head commit under review")
+
+    findings, questions = out["findings"], out["questions"]
+    for name, values in [("findings", [f["finding_id"] for f in findings]),
+                         ("questions", [q["id"] for q in questions]),
+                         ("test conditions", [t["id"] for t in out.get("test_conditions", [])])]:
+        if dupes(values):
+            raise HarnessError("duplicate_id", f"duplicate IDs in {name}: {len(dupes(values))}")
+
+    # A finding ID is derived: <checklist ID>|<location key>|<primary cited ID> (S-BA-032).
+    for i, f in enumerate(findings):
+        checklist_id, _, rest = f["finding_id"].partition("|")
+        primary = rest.rpartition("|")[2]
+        if checklist_id != f["checklist_id"]:
+            raise HarnessError("finding_id_invalid", f"/findings/{i}/finding_id does not start with its checklist_id")
+        if primary not in f["cited_ids"]:
+            raise HarnessError("finding_id_invalid", f"/findings/{i}/finding_id names a primary ID missing from cited_ids")
+
+    ids = {f["finding_id"] for f in findings}
+    for i, c in enumerate(out.get("proposed_changes", [])):
+        if c["finding_id"] not in ids:
+            raise HarnessError("unknown_finding", f"/proposed_changes/{i}/finding_id is not a finding of this run")
+
+    # Blocking questions first, then priority 1..n (S-BA-014).
+    seen_non_blocking = False
+    for i, q in enumerate(questions):
+        if q["blocking"] and seen_non_blocking:
+            raise HarnessError("blocking_order", f"/questions/{i} is blocking but follows a non-blocking question")
+        seen_non_blocking = seen_non_blocking or not q["blocking"]
+        if q["priority"] != i + 1:
+            raise HarnessError("blocking_order", f"/questions/{i}/priority is not {i + 1}")
+        if q["recommended"] not in {o["id"] for o in q["options"]}:
+            raise HarnessError("recommended_not_option", f"/questions/{i}/recommended")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--envelope", required=True, help="stdout of claude -p --output-format json")
     ap.add_argument("--schema", required=True, help="the full read-stage schema")
-    ap.add_argument("--areas", required=True, help="product .staff/areas.yml")
+    ap.add_argument("--agent", choices=["analyst", "reviewer"], default="analyst")
+    ap.add_argument("--areas", help="product .staff/areas.yml (analyst)")
+    ap.add_argument("--input", help="the review input file, for the expected type, target and commit (reviewer)")
+    ap.add_argument("--strip-prefix", action="append", default=[], metavar="/DIR/=REPL",
+                    help="rewrite an absolute checkout prefix in the output, e.g. /w/head/=head: (reviewer)")
     ap.add_argument("--max-run-usd", type=float, required=True)
     ap.add_argument("--stage", type=int, default=1)
     ap.add_argument("--out", required=True, help="validated output, written only on success")
@@ -158,16 +262,32 @@ def main():
         check_run(env, args.max_run_usd)
         out = extract(env)
         check_schema(out, load_json(args.schema, "agent_invalid"))
-        check_harness(out, load_areas(args.areas), args.stage)
+        if args.agent == "reviewer":
+            if not args.input:
+                raise HarnessError("input_invalid", "--input is required with --agent reviewer")
+            expect = load_json(args.input, "input_invalid")
+            check_review(out, expect["artifact_type"], expect["target"]["ref"], expect["reviewed_sha"])
+            result["findings_reordered"] = sort_findings(out)
+            result["paths_relativized"] = relativize(out, parse_prefixes(args.strip_prefix))
+        else:
+            if not args.areas:
+                raise HarnessError("input_invalid", "--areas is required with --agent analyst")
+            check_harness(out, load_areas(args.areas), args.stage)
     except HarnessError as err:
         result.update(reason=err.reason, detail=err.detail)
         write_json(args.result, result)
         raise
-    result.update(ok=True, outcome=out["outcome"])
+    if args.agent == "reviewer":
+        result.update(ok=True, outcome=out["verdict"])
+        summary = (f"verdict={out['verdict']}, {len(out['findings'])} findings, "
+                   f"{len(out['questions'])} questions")
+    else:
+        result.update(ok=True, outcome=out["outcome"])
+        summary = (f"outcome={out['outcome']}, {len(out['requirements'])} requirements, "
+                   f"{len(out['questions'])} questions")
     write_json(args.result, result)
     write_json(args.out, out)
-    print(f"output valid: outcome={out['outcome']}, {len(out['requirements'])} requirements, "
-          f"{len(out['questions'])} questions, cost {result['cost_usd']} USD")
+    print(f"output valid: {summary}, cost {result['cost_usd']} USD")
 
 
 if __name__ == "__main__":

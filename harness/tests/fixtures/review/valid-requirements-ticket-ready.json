@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "reviewer",
+  "artifact_type": "requirements",
+  "target": {
+    "kind": "ticket",
+    "ref": "issue#17"
+  },
+  "reviewed_sha": null,
+  "verdict": "ready",
+  "decision_summary": "No decisions needed. Checked RC-1 to RC-9. RC-4 checked only between requirements: the area has no rules registry yet (S-BA-045).",
+  "findings": [],
+  "questions": [],
+  "proposed_changes": [],
+  "test_conditions": [],
+  "source_refs": [
+    "issue#17",
+    "knowledge/product-core.md"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "reviewer",
+  "artifact_type": "code",
+  "target": {
+    "kind": "pull_request",
+    "ref": "pr#63"
+  },
+  "reviewed_sha": "4b8e1c0d9a7f6e5d4c3b2a1908f7e6d5c4b3a291",
+  "verdict": "not_ready",
+  "decision_summary": "Decide first: one private security report was filed. CC-2: the PR block omits a check: review constraint.",
+  "findings": [
+    {
+      "finding_id": "CC-4|src/orders/handler.ts#cancelOrder|S-SEC-011",
+      "checklist_id": "CC-4",
+      "severity": "blocker",
+      "location": "src/orders/handler.ts#cancelOrder",
+      "text": "Details withheld (S-SEC-011).",
+      "suggestion": "See the private report.",
+      "cited_ids": [
+        "S-SEC-011",
+        "S-DEV-019"
+      ],
+      "evidence_refs": [
+        "src/orders/handler.ts"
+      ],
+      "classification": "issue"
+    },
+    {
+      "finding_id": "CC-2|src/orders/service.ts#createOrder|ADR-002/C-1",
+      "checklist_id": "CC-2",
+      "severity": "major",
+      "location": "src/orders/service.ts#createOrder",
+      "text": "createOrder writes to the billing store directly; ADR-002/C-1 requires going through IF-005. constraints[] does not list ADR-002/C-1.",
+      "suggestion": "Call the IF-005 client instead and add ADR-002/C-1 to constraints[] with disposition conform.",
+      "cited_ids": [
+        "ADR-002/C-1",
+        "IF-005@1.0.0"
+      ],
+      "evidence_refs": [
+        "src/orders/service.ts:L88",
+        "architecture/orders/adr/ADR-002.md"
+      ],
+      "classification": "conflicts"
+    }
+  ],
+  "questions": [],
+  "source_refs": [
+    "pr#63",
+    "AGENTS.md",
+    "architecture/orders/adr/ADR-002.md"
+  ]
+}

@@ -11,7 +11,7 @@ from jsonschema import Draft7Validator, Draft202012Validator
 
 from helpers import STAFF, run_cli
 
-from prepare_agent import HARNESS_CONTRACT, build_prompt, cli_schema
+from prepare_agent import ANALYST_CONTRACT, build_prompt, cli_schema
 
 ENG = os.path.join(STAFF, "plugins", "staff-engineering")
 PLUGINS = os.path.join(STAFF, "plugins")
@@ -271,7 +271,7 @@ class DeveloperAgentPackTest(unittest.TestCase):
         for name, path in AGENTS.items():
             with self.subTest(name):
                 prompt, _ = build_prompt(path, PLUGINS)
-                pack = len(prompt) - len(HARNESS_CONTRACT)
+                pack = len(prompt) - len(ANALYST_CONTRACT)
                 self.assertLess(pack, PACK_CAP_CHARS)
                 self.assertLess(len(prompt), PACK_CAP_CHARS)
 

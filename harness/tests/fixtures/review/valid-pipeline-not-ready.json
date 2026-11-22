@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "reviewer",
+  "artifact_type": "pipeline",
+  "target": {
+    "kind": "pull_request",
+    "ref": "pr#81"
+  },
+  "reviewed_sha": "4b8e1c0d9a7f6e5d4c3b2a1908f7e6d5c4b3a291",
+  "verdict": "not_ready",
+  "decision_summary": "Decide first: the test job now asks for id-token: write, which it does not need. PL-6 checked only within the PR: no IaC for this stack yet.",
+  "findings": [
+    {
+      "finding_id": "PL-2|.github/workflows/build.yml#jobs.test.permissions|S-DEVOPS-018",
+      "checklist_id": "PL-2",
+      "severity": "blocker",
+      "location": ".github/workflows/build.yml#jobs.test.permissions",
+      "text": "The test job runs PR code on the isolated pool and now requests id-token: write.",
+      "suggestion": "Remove id-token: write from the test job; the runner controller stages its credentials.",
+      "cited_ids": [
+        "S-DEVOPS-018",
+        "S-DEVOPS-042"
+      ],
+      "evidence_refs": [
+        ".github/workflows/build.yml:L31",
+        "pipeline-diff-check#run-902"
+      ],
+      "classification": "issue"
+    }
+  ],
+  "questions": [],
+  "private_reports": [],
+  "source_refs": [
+    "pr#81",
+    ".staff/delivery.yml"
+  ]
+}

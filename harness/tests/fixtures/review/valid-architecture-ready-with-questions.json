@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "reviewer",
+  "artifact_type": "architecture",
+  "target": {
+    "kind": "pull_request",
+    "ref": "pr#52"
+  },
+  "reviewed_sha": "4b8e1c0d9a7f6e5d4c3b2a1908f7e6d5c4b3a291",
+  "verdict": "ready_with_questions",
+  "decision_summary": "Decide: whether the new event needs a public deprecation plan. AR-1 found no conflict with accepted ADRs.",
+  "findings": [
+    {
+      "finding_id": "AR-5|IF-003#versions[2.0.0]|IF-003@1.4.0",
+      "checklist_id": "AR-5",
+      "severity": "major",
+      "location": "architecture/orders/interfaces/IF-003.md#versions",
+      "text": "Version 2.0.0 removes the field total_net, which is breaking, but 1.4.0 is not marked deprecated and has no sunset.",
+      "rewording": "Mark IF-003@1.4.0 deprecated with a sunset at least 90 days after deprecation.",
+      "cited_ids": [
+        "IF-003@1.4.0",
+        "S-ARCH-023"
+      ],
+      "evidence_refs": [
+        "architecture/orders/interfaces/IF-003.md:L22",
+        "compatibility-check#run-881"
+      ],
+      "classification": "issue"
+    },
+    {
+      "finding_id": "AR-1|ADR-004#options[b]|ADR-002/C-1",
+      "checklist_id": "AR-1",
+      "severity": "minor",
+      "location": "architecture/orders/adr/ADR-004.md#options[b]",
+      "text": "Option b relies on a shared store that ADR-002/C-1 allows only for read models; the option does not say which it is.",
+      "rewording": "State in option b that the shared store is a read model, as ADR-002/C-1 allows.",
+      "cited_ids": [
+        "ADR-002/C-1"
+      ],
+      "evidence_refs": [
+        "architecture/orders/adr/ADR-002.md"
+      ],
+      "classification": "conflicts"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-001",
+      "blocks": [
+        "IF-003@1.4.0"
+      ],
+      "blocking": false,
+      "text": "Is IF-003 used by external consumers, so the 90-day sunset applies?",
+      "options": [
+        {
+          "id": "a",
+          "text": "Option A: keep the current wording."
+        },
+        {
+          "id": "b",
+          "text": "Option B: narrow it as the finding suggests."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    }
+  ],
+  "source_refs": [
+    "pr#52",
+    "architecture/overview.md",
+    "architecture/orders/adr/ADR-002.md"
+  ]
+}

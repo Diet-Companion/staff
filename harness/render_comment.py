@@ -73,12 +73,13 @@ def footer(args):
     ])
 
 
-def render_questions(questions):
+def render_questions(questions, hint=ANSWER_HINT):
     out = ["#### Questions", ""]
     for q in questions:
         mark = "**blocking**" if q["blocking"] else "non-blocking"
+        key = f" · key: {key_text(q['key'])}" if q.get("key") else ""  # optional for the reviewer
         out += [
-            f"**{esc(q['id'])}** ({mark} · blocks {ids(q['blocks'])} · key: {key_text(q['key'])})",
+            f"**{esc(q['id'])}** ({mark} · blocks {ids(q['blocks'])}{key})",
             "",
             quote(q["text"]),
             "",
@@ -87,7 +88,7 @@ def render_questions(questions):
             rec = " **(recommended)**" if o["id"] == q["recommended"] else ""
             out.append(f"- {esc(o['id'])}) {esc(o['text'])}{rec}")
         out += ["", f"Recommended: **{esc(q['recommended'])}**", ""]
-    out.append(ANSWER_HINT)
+    out.append(hint)
     return out
 
 
