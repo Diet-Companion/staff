@@ -15,6 +15,7 @@ import json
 import re
 from collections import Counter
 
+import yaml
 from jsonschema import Draft202012Validator
 
 from common import HarnessError, load_json, run_main, write_json
@@ -146,6 +147,105 @@ def check_harness(out, areas, stage):
 SEVERITY_RANK = {"blocker": 0, "major": 1, "minor": 2}
 
 
+# Stage-1 statuses for new drafts (S-ARCH-011): never moved forward by an agent.
+ARCH_DRAFT_STATUS = {"adr": "proposed", "component": "proposed", "qas": "draft"}
+# Human-owned fields (S-ARCH-020) that may be non-null only when answers_applied cites an operator comment.
+ARCH_OWNER_FIELDS = {
+    "adr": ["decision"],
+    "component": ["provenance_confirmed_by"],
+    "interface": ["compatibility_policy"],
+    "qas": ["gap_accepted_by"],
+}
+
+
+def _applied(out, target, field):
+    return any(a["target"] == target and a["field"].split(".")[0].split("[")[0] == field
+               for a in out["answers_applied"])
+
+
+def check_architect(out, expect, stage=1):
+    """Architect checks JSON Schema can't express (S-ARCH-037). Raises on the first failing check."""
+    run, areas = expect["run"], expect["product"]["areas"]
+    if out["trigger"]["kind"] != run["trigger"] or out["trigger"]["ref"] != run["intake_ref"]:
+        raise HarnessError("trigger_mismatch", "/trigger is not the run's trigger kind and ref")
+    if out["trigger"]["area"] not in areas:
+        raise HarnessError("unknown_area", "/trigger/area is not in .staff/areas.yml")
+    arts = out["artifacts"]
+    for i, a in enumerate(arts):
+        if a["area"] not in areas:
+            raise HarnessError("unknown_area", f"/artifacts/{i}/area is not in .staff/areas.yml")
+
+    # Unique IDs, and constraints numbered under their own ADR (S-ARCH-005).
+    ids = {"artifacts": [a["id"] for a in arts], "questions": [q["id"] for q in out["questions"]],
+           "assumptions": [a["id"] for a in out["assumptions"]]}
+    adrs = {a["id"]: a for a in arts if a["type"] == "adr"}
+    for aid, adr in adrs.items():
+        ids[f"{aid} options"] = [o["key"] for o in adr["options"]]
+        ids[f"{aid} constraints"] = [c["id"] for o in adr["options"] for c in o["constraints"]]
+        for o in adr["options"]:
+            for c in o["constraints"]:
+                if not c["id"].startswith(aid + "/"):
+                    raise HarnessError("constraint_id_mismatch", f"{aid} option {o['key']} has a constraint of another ADR")
+        if adr["recommended"]["option"] not in ids[f"{aid} options"]:
+            raise HarnessError("option_mismatch", f"{aid} recommends an option it doesn't have")
+    for name, values in ids.items():
+        if dupes(values):
+            raise HarnessError("duplicate_id", f"duplicate IDs in {name}")
+
+    # Stage 1: drafts only, and no human-owned field without a cited operator answer (S-ARCH-011, -020).
+    operator_refs = {c["ref"] for c in expect["untrusted"]["comments"] if c["author_kind"] == "operator"}
+    for i, a in enumerate(out["answers_applied"]):
+        if a["comment_ref"] not in operator_refs:
+            raise HarnessError("owner_field_set", f"/answers_applied/{i} does not cite an operator comment of this ticket")
+    for i, a in enumerate(arts):
+        if stage == 1 and a["type"] in ARCH_DRAFT_STATUS and a["status"] != ARCH_DRAFT_STATUS[a["type"]]:
+            raise HarnessError("stage_violation", f"/artifacts/{i}/status is not {ARCH_DRAFT_STATUS[a['type']]} at stage 1")
+        if stage == 1 and a["type"] == "interface" and any(v["status"] != "draft" for v in a["versions"]):
+            raise HarnessError("stage_violation", f"/artifacts/{i} has an interface version that is not draft at stage 1")
+        for field in ARCH_OWNER_FIELDS.get(a["type"], []):
+            if a.get(field) is not None and not _applied(out, a["id"], field):
+                raise HarnessError("owner_field_set", f"/artifacts/{i}/{field} is set without an operator answer")
+        for item in a.get("testability", []):
+            if item.get("gap_accepted_by") is not None and not _applied(out, a["id"], "testability"):
+                raise HarnessError("owner_field_set", f"/artifacts/{i} accepts a testability gap without an operator answer")
+
+    # Questions: blocking first, 1..n, a real recommended option; an ADR question offers that ADR's options.
+    seen_non_blocking = False
+    for i, q in enumerate(out["questions"]):
+        if q["blocking"] and seen_non_blocking:
+            raise HarnessError("blocking_order", f"/questions/{i} is blocking but follows a non-blocking question")
+        seen_non_blocking = seen_non_blocking or not q["blocking"]
+        if q["priority"] != i + 1:
+            raise HarnessError("blocking_order", f"/questions/{i}/priority is not {i + 1}")
+        if q["recommended"] not in {o["id"] for o in q["options"]}:
+            raise HarnessError("recommended_not_option", f"/questions/{i}/recommended")
+        if q.get("adr"):
+            adr = adrs.get(q["adr"])
+            if adr is None:
+                raise HarnessError("unknown_reference", f"/questions/{i}/adr is not an ADR of this run")
+            if [o["id"] for o in q["options"]] != [o["key"] for o in adr["options"]]:
+                raise HarnessError("option_mismatch", f"/questions/{i} does not offer {q['adr']}'s options in order")
+
+    for i, c in enumerate(out["conflicts"]):
+        adr = adrs.get(c["adr"])
+        if adr is None or c["option_key"] not in {o["key"] for o in adr["options"]}:
+            raise HarnessError("unknown_reference", f"/conflicts/{i} names an ADR option not in this run")
+
+    # Every spec belongs to a drafted interface version and parses (S-ARCH-021, -037).
+    versions = {(a["id"], v["version"]) for a in arts if a["type"] == "interface" for v in a["versions"]}
+    for i, s in enumerate(out["spec_versions"]):
+        if (s["if_id"], s["version"]) not in versions:
+            raise HarnessError("unknown_reference", f"/spec_versions/{i} is not a drafted interface version")
+        try:
+            doc = yaml.safe_load(s["document"])
+        except Exception:
+            raise HarnessError("spec_invalid", f"/spec_versions/{i}/document does not parse") from None
+        if not isinstance(doc, dict):
+            raise HarnessError("spec_invalid", f"/spec_versions/{i}/document is not a mapping")
+        if s["format"].lower().startswith("openapi") and "openapi" not in doc:
+            raise HarnessError("spec_invalid", f"/spec_versions/{i}/document has no openapi version")
+
+
 def sort_findings(out):
     """Order findings blocker first (S-BA-032), keeping the model's order within a severity.
 
@@ -243,7 +343,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--envelope", required=True, help="stdout of claude -p --output-format json")
     ap.add_argument("--schema", required=True, help="the full read-stage schema")
-    ap.add_argument("--agent", choices=["analyst", "reviewer"], default="analyst")
+    ap.add_argument("--agent", choices=["analyst", "reviewer", "architect"], default="analyst")
     ap.add_argument("--areas", help="product .staff/areas.yml (analyst)")
     ap.add_argument("--input", help="the review input file, for the expected type, target and commit (reviewer)")
     ap.add_argument("--strip-prefix", action="append", default=[], metavar="/DIR/=REPL",
@@ -269,6 +369,10 @@ def main():
             check_review(out, expect["artifact_type"], expect["target"]["ref"], expect["reviewed_sha"])
             result["findings_reordered"] = sort_findings(out)
             result["paths_relativized"] = relativize(out, parse_prefixes(args.strip_prefix))
+        elif args.agent == "architect":
+            if not args.input:
+                raise HarnessError("input_invalid", "--input is required with --agent architect")
+            check_architect(out, load_json(args.input, "input_invalid"), args.stage)
         else:
             if not args.areas:
                 raise HarnessError("input_invalid", "--areas is required with --agent analyst")
@@ -277,7 +381,11 @@ def main():
         result.update(reason=err.reason, detail=err.detail)
         write_json(args.result, result)
         raise
-    if args.agent == "reviewer":
+    if args.agent == "architect":
+        result.update(ok=True, outcome=out["outcome"])
+        summary = (f"outcome={out['outcome']}, {len(out['artifacts'])} artifacts, "
+                   f"{len(out['questions'])} questions, {len(out['defect_items'])} defect items")
+    elif args.agent == "reviewer":
         result.update(ok=True, outcome=out["verdict"])
         summary = (f"verdict={out['verdict']}, {len(out['findings'])} findings, "
                    f"{len(out['questions'])} questions")

@@ -25,6 +25,9 @@ REASONS = {
     # reviewer output (validate_output.py --agent reviewer)
     "type_mismatch", "target_mismatch", "sha_mismatch", "finding_id_invalid", "severity_order",
     "unknown_finding",
+    # architect output (validate_output.py --agent architect)
+    "trigger_mismatch", "constraint_id_mismatch", "option_mismatch", "owner_field_set", "spec_invalid",
+    "unknown_reference",
     # redaction of the output (redact_check.py, check_transcript.py)
     "redaction_hit",
     # interview transcripts (check_transcript.py)
