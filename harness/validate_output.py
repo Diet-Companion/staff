@@ -146,6 +146,17 @@ def check_harness(out, areas, stage):
 SEVERITY_RANK = {"blocker": 0, "major": 1, "minor": 2}
 
 
+def sort_findings(out):
+    """Order findings blocker first (S-BA-032), keeping the model's order within a severity.
+
+    Ordering is presentation, not content, so the harness fixes it instead of failing
+    the run (live run 45031393545). Returns True when the order changed.
+    """
+    before = [f["finding_id"] for f in out["findings"]]
+    out["findings"].sort(key=lambda f: SEVERITY_RANK[f["severity"]])
+    return [f["finding_id"] for f in out["findings"]] != before
+
+
 def check_review(out, expect_type, expect_target, expect_sha):
     """Reviewer checks JSON Schema can't express. Raises on the first failing check."""
     if out["artifact_type"] != expect_type:
@@ -163,7 +174,6 @@ def check_review(out, expect_type, expect_target, expect_sha):
             raise HarnessError("duplicate_id", f"duplicate IDs in {name}: {len(dupes(values))}")
 
     # A finding ID is derived: <checklist ID>|<location key>|<primary cited ID> (S-BA-032).
-    last = -1
     for i, f in enumerate(findings):
         checklist_id, _, rest = f["finding_id"].partition("|")
         primary = rest.rpartition("|")[2]
@@ -171,10 +181,6 @@ def check_review(out, expect_type, expect_target, expect_sha):
             raise HarnessError("finding_id_invalid", f"/findings/{i}/finding_id does not start with its checklist_id")
         if primary not in f["cited_ids"]:
             raise HarnessError("finding_id_invalid", f"/findings/{i}/finding_id names a primary ID missing from cited_ids")
-        rank = SEVERITY_RANK[f["severity"]]
-        if rank < last:
-            raise HarnessError("severity_order", f"/findings/{i} is more severe than the finding before it")
-        last = rank
 
     ids = {f["finding_id"] for f in findings}
     for i, c in enumerate(out.get("proposed_changes", [])):
@@ -219,6 +225,7 @@ def main():
                 raise HarnessError("input_invalid", "--input is required with --agent reviewer")
             expect = load_json(args.input, "input_invalid")
             check_review(out, expect["artifact_type"], expect["target"]["ref"], expect["reviewed_sha"])
+            result["findings_reordered"] = sort_findings(out)
         else:
             if not args.areas:
                 raise HarnessError("input_invalid", "--areas is required with --agent analyst")

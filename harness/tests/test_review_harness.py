@@ -16,7 +16,7 @@ from prepare_agent import build_prompt, cli_schema
 from redact_check import scan
 from render_review import BLOCK_TAG, labels, render_review
 from run_record import role_fields
-from validate_output import check_review
+from validate_output import check_review, sort_findings
 
 PLUGINS = os.path.join(STAFF, "plugins")
 AGENT = os.path.join(PLUGINS, "staff-review", "agents", "reviewer.md")
@@ -193,10 +193,21 @@ class CheckReviewTest(unittest.TestCase):
         self.assert_reason(doc, "finding_id_invalid")
         doc = review_fixture()
         doc["findings"].reverse()
-        self.assert_reason(doc, "severity_order")
+        self.check(doc)  # order is fixed by sort_findings, not a failure
         doc = review_fixture()
         doc["findings"].append(copy.deepcopy(doc["findings"][1]))
         self.assert_reason(doc, "duplicate_id")
+
+    def test_sort_findings_is_stable_by_severity(self):
+        doc = review_fixture()
+        minor = dict(copy.deepcopy(doc["findings"][1]), severity="minor", finding_id="RC-2|REQ-012/AC-009|S-BA-007")
+        major2 = dict(copy.deepcopy(doc["findings"][1]), finding_id="RC-2|REQ-012/AC-008|S-BA-007")
+        blocker, major = doc["findings"]
+        doc["findings"] = [minor, major, blocker, major2]
+        self.assertTrue(sort_findings(doc))
+        self.assertEqual([f["finding_id"] for f in doc["findings"]],
+                         [blocker["finding_id"], major["finding_id"], major2["finding_id"], minor["finding_id"]])
+        self.assertFalse(sort_findings(doc))
 
     def test_proposed_change_needs_its_finding(self):
         doc = review_fixture()
