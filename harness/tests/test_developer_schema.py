@@ -132,13 +132,16 @@ class DeveloperSchemaTest(unittest.TestCase):
             with self.subTest(os.path.basename(path)):
                 self.assertEqual(self.errors(schema_for(path), load(path)), [])
 
-    def test_cli_copy_agrees_on_fixtures(self):
+    def test_cli_copy_is_never_stricter(self):
+        # The CLI copy drops top-level allOf/if/then (the API rejects them, #10), so it may accept
+        # output that the full schema rejects; validate_output.py then applies the full schema.
+        # It must never reject output the full schema accepts.
         for path in self.valid_fixtures() + sorted(glob.glob(os.path.join(FIX, "invalid", "*.json"))):
             agent = schema_for(path)
             with self.subTest(os.path.basename(path)):
                 full = bool(self.errors(agent, load(path)))
                 cli = bool(list(Draft7Validator(cli_schema(self.schemas[agent])).iter_errors(load(path))))
-                self.assertEqual(full, cli)
+                self.assertTrue(full or not cli)
 
     INVALID = {
         "developer-files-without-pr.json": "/proposed_files",
@@ -247,7 +250,10 @@ class DeveloperAgentPackTest(unittest.TestCase):
     """The agents build with prepare_agent.build_prompt(agent_path, plugins_root) and fit S-GEN-009."""
 
     def test_build_prompt_signature(self):
-        self.assertEqual(list(inspect.signature(build_prompt).parameters), ["agent_path", "plugins_root"])
+        # Two positional parameters; the reviewer's --skill and --contract options are optional (#12).
+        params = inspect.signature(build_prompt).parameters
+        self.assertEqual(list(params)[:2], ["agent_path", "plugins_root"])
+        self.assertTrue(all(p.default is not inspect.Parameter.empty for p in list(params.values())[2:]))
 
     def test_agents_build_read_only(self):
         skills = {
