@@ -147,7 +147,8 @@ def check_harness(out, areas, stage):
 SEVERITY_RANK = {"blocker": 0, "major": 1, "minor": 2}
 
 
-# Stage-1 statuses for new drafts (S-ARCH-011): never moved forward by an agent.
+# Stage-1 statuses for new drafts (S-ARCH-011): never moved forward by an agent. The one exception is an
+# ADR decided by a cited operator answer, whose status follows decision.outcome (checked below).
 ARCH_DRAFT_STATUS = {"adr": "proposed", "component": "proposed", "qas": "draft"}
 # Human-owned fields (S-ARCH-020) that may be non-null only when answers_applied cites an operator comment.
 ARCH_OWNER_FIELDS = {
@@ -198,7 +199,17 @@ def check_architect(out, expect, stage=1):
         if a["comment_ref"] not in operator_refs:
             raise HarnessError("owner_field_set", f"/answers_applied/{i} does not cite an operator comment of this ticket")
     for i, a in enumerate(arts):
-        if stage == 1 and a["type"] in ARCH_DRAFT_STATUS and a["status"] != ARCH_DRAFT_STATUS[a["type"]]:
+        decision = a.get("decision") if a["type"] == "adr" else None
+        if stage == 1 and decision:
+            # An answered ADR: its status follows decision.outcome, so the file the human commits passes the
+            # lifecycle check, which fails an ADR merged as proposed (S-ARCH-011, -019 item 2).
+            if a["status"] != decision["outcome"]:
+                raise HarnessError("stage_violation", f"/artifacts/{i}/status is not its decision.outcome")
+            if decision["decided_by"] not in operator_refs:
+                raise HarnessError("owner_field_set", f"/artifacts/{i}/decision/decided_by is not an operator comment of this ticket")
+            if decision["outcome"] == "accepted" and decision["chosen"] not in ids[f"{a['id']} options"]:
+                raise HarnessError("option_mismatch", f"/artifacts/{i}/decision/chosen is not one of its options")
+        elif stage == 1 and a["type"] in ARCH_DRAFT_STATUS and a["status"] != ARCH_DRAFT_STATUS[a["type"]]:
             raise HarnessError("stage_violation", f"/artifacts/{i}/status is not {ARCH_DRAFT_STATUS[a['type']]} at stage 1")
         if stage == 1 and a["type"] == "interface" and any(v["status"] != "draft" for v in a["versions"]):
             raise HarnessError("stage_violation", f"/artifacts/{i} has an interface version that is not draft at stage 1")

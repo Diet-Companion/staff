@@ -140,14 +140,46 @@ class CheckArchitectTest(unittest.TestCase):
         iface["versions"][0]["status"] = "approved"
         self.assert_reason(doc, "stage_violation")
 
+    def decide(self, doc, outcome="accepted", chosen="b"):
+        ref = f"{REPO}#40 comment 7"
+        adr = self.adr(doc)
+        adr["decision"] = {"outcome": outcome, "chosen": chosen, "decided_by": ref}
+        adr["status"] = outcome
+        doc["answers_applied"] = [{"target": adr["id"], "field": "decision", "comment_ref": ref}]
+        return adr
+
     def test_owner_fields_need_an_operator_answer(self):
         doc = load("architect-design.json")
-        self.adr(doc)["decision"] = {"chosen": "b"}
-        self.assert_reason(doc, "owner_field_set")
-        doc["answers_applied"] = [{"target": self.adr(doc)["id"], "field": "decision.chosen",
-                                   "comment_ref": f"{REPO}#40 comment 7"}]
+        self.decide(doc)
+        doc["answers_applied"] = []
+        self.assert_reason(doc, "owner_field_set", expect_for(doc, comments=[
+            {"ref": f"{REPO}#40 comment 7", "author_kind": "operator"}]))
+        doc = load("architect-design.json")
+        self.decide(doc)
         self.assert_reason(doc, "owner_field_set", expect_for(doc, comments=[]))  # not this ticket's operator
         check_architect(doc, expect_for(doc))  # now cited
+
+    def test_answered_adr_status_follows_the_decision(self):
+        for outcome, chosen in (("accepted", "b"), ("rejected", None)):
+            doc = load("architect-design.json")
+            self.decide(doc, outcome, chosen)
+            check_architect(doc, expect_for(doc))
+            with self.subTest(outcome):
+                self.adr(doc)["status"] = "proposed"
+                self.assert_reason(doc, "stage_violation")
+        doc = load("architect-design.json")
+        self.decide(doc)["status"] = "rejected"
+        self.assert_reason(doc, "stage_violation")
+        doc = load("architect-design.json")
+        self.decide(doc, chosen="z")
+        self.assert_reason(doc, "option_mismatch")
+        doc = load("architect-design.json")
+        self.decide(doc)["decision"]["decided_by"] = f"{REPO}#40 comment 8"
+        self.assert_reason(doc, "owner_field_set")
+        doc = load("architect-design.json")
+        self.decide(doc)  # a decided ADR doesn't free the other drafts' statuses
+        next(a for a in doc["artifacts"] if a["type"] == "component")["status"] = "active"
+        self.assert_reason(doc, "stage_violation")
 
     def test_conflicts_specs_and_question_order(self):
         doc = load("architect-design.json")

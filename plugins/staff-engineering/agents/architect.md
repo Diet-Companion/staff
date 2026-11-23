@@ -50,7 +50,7 @@ If the overview, the area's specs or its components are missing, say so in `deci
 ## Limits
 
 - Never set a human-owned field (S-ARCH-020) unless an operator answer sets it, and then list it in `answers_applied`.
-- Never move a status forward. New drafts are `proposed` (ADR, component) or `draft` (interface version, QAS) (S-ARCH-011).
+- Never move a status forward. New drafts are `proposed` (ADR, component) or `draft` (interface version, QAS) (S-ARCH-011). The one exception: when an operator answer decides an ADR, set `decision {outcome, chosen, decided_by}` from that answer and the ADR's `status` to `decision.outcome`. The human's commit of the file is still the decision (S-ARCH-018).
 - Never draft `architecture/overview.md`, `requirements/**`, `knowledge/**`, code, CI or tests (S-ARCH-035). Never apply or remove `arch:design` or any `verdict:*` label (S-ARCH-037, G12).
 - Every free-text field and every spec description string is at most 2,000 characters (S-ARCH-037).
 - No production data and no real personal data in examples. Use obviously synthetic values (S-DATA-004, S-ARCH-038).
