@@ -47,6 +47,22 @@ def role_fields(validated):
     """
     if not validated:
         return {}
+    if validated.get("agent") == "architect":
+        arts = validated["artifacts"]
+        by = lambda kind: [a["id"] for a in arts if a["type"] == kind]
+        adrs = [a for a in arts if a["type"] == "adr"]
+        return {  # S-ARCH-040
+            "req_ids": sorted({r for a in arts for r in (a.get("drivers") or ([a["req"]] if a.get("req") else []))
+                               if str(r).startswith("REQ-")}),
+            "adr_ids": by("adr"), "cmp_ids": by("component"), "qas_ids": by("qas"),
+            "if_versions": [f"{a['id']}@{v['version']}" for a in arts if a["type"] == "interface" for v in a["versions"]],
+            "options_count": {a["id"]: len(a["options"]) for a in adrs},
+            "recommended_option": {a["id"]: a["recommended"]["option"] for a in adrs},
+            "compat_class": None,  # set by the compatibility check, not the agent (S-ARCH-022)
+            "defect_items_raised": len(validated["defect_items"]),
+            "drift_ids": [q["drift_id"] for q in validated["questions"] if q.get("drift_id")],
+            "question_ids": [q["id"] for q in validated["questions"]],
+        }
     if validated.get("agent") == "reviewer":
         return {
             "artifact_type": validated["artifact_type"],
