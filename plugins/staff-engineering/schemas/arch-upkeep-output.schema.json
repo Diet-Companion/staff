@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-engineering:arch-upkeep-output:1.0.0",
+  "title": "arch-upkeep read-stage output",
+  "description": "Structured output of the arch-upkeep read stage (S-ARCH-037). The staff-core harness validates it and rejects any action outside the allowed set (S-SEC-002, S-SEC-003). Component patches carry only code_paths, so no other component field can change (S-ARCH-035, S-ARCH-044). Free-text fields are quoted data, at most 2,000 characters each (S-SEC-002).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "run",
+    "decision_summary",
+    "component_patches",
+    "overview_sections",
+    "unmapped",
+    "areas_done",
+    "areas_deferred",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "agent": { "const": "arch-upkeep" },
+    "run": {
+      "description": "The nightly run (S-ARCH-034).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["date", "overview_batch", "changes"],
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "overview_batch": {
+          "description": "True only on the weekly overview batch run (starting value, S-ARCH-034). When false, overview_sections is empty.",
+          "type": "boolean"
+        },
+        "changes": {
+          "description": "The merged product PRs and mapping findings this run considered, oldest first.",
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/ref" }
+        }
+      }
+    },
+    "decision_summary": {
+      "description": "Required. What the human has to check first (new file assignments, unmapped files, overview changes), then the rest.",
+      "$ref": "#/$defs/text"
+    },
+    "component_patches": {
+      "description": "code_paths changes per component (S-ARCH-037). Compared as a net set of mapped files (S-ARCH-044).",
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cmp_id", "area", "code_paths_added", "code_paths_removed", "evidence_refs"],
+        "properties": {
+          "cmp_id": { "$ref": "#/$defs/cmp_id" },
+          "area": { "$ref": "#/$defs/area" },
+          "code_paths_added": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/path_glob" } },
+          "code_paths_removed": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/path_glob" } },
+          "evidence_refs": {
+            "description": "The merged PRs, renames or files that show the change.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "$ref": "#/$defs/ref" }
+          }
+        },
+        "anyOf": [
+          { "properties": { "code_paths_added": { "minItems": 1 } } },
+          { "properties": { "code_paths_removed": { "minItems": 1 } } }
+        ]
+      }
+    },
+    "overview_sections": {
+      "description": "Patched sections of architecture/overview.md, each at most 2,000 characters; at most 3,000 tokens in total (starting value, S-ARCH-010).",
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["section_id", "text"],
+        "properties": {
+          "section_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+          "text": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "unmapped": {
+      "description": "Files no component maps after this run (S-ARCH-037).",
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "candidate_cmp", "reason"],
+        "properties": {
+          "path": { "$ref": "#/$defs/path_glob" },
+          "candidate_cmp": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/cmp_id" }] },
+          "reason": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "areas_done": {
+      "description": "Areas this run finished.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/area" }
+    },
+    "areas_deferred": {
+      "description": "Areas left for the next night because the run stopped before its cap; the digest lists them (S-ARCH-034).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/area" }
+    },
+    "advisory_notes": {
+      "description": "Rule candidates noticed in the diffs. Never written to knowledge/**; the digest lists them (S-ARCH-046).",
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "text", "source_refs"],
+        "properties": {
+          "kind": { "const": "rule_candidate" },
+          "text": { "$ref": "#/$defs/text" },
+          "source_refs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/ref" } }
+        }
+      }
+    },
+    "private_reports": {
+      "description": "Suspected vulnerabilities or exposed secrets: location only, never the value (S-SEC-004, S-SEC-011).",
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "location"],
+        "properties": {
+          "category": { "enum": ["suspected_vulnerability", "exposed_secret"] },
+          "location": { "$ref": "#/$defs/ref" },
+          "note": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites (S-ARCH-014).",
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/ref" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "run": { "properties": { "overview_batch": { "const": false } }, "required": ["overview_batch"] } },
+        "required": ["run"]
+      },
+      "then": { "properties": { "overview_sections": { "maxItems": 0 } } }
+    }
+  ],
+  "$defs": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "ref": {
+      "description": "A source ref: merged PR, commit, rename, file path, drift-report finding or ARCH ID.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "area": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" },
+    "cmp_id": { "type": "string", "pattern": "^CMP-[0-9]{3,}$" },
+    "path_glob": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "^[^\\s]+$" }
+  }
+}
