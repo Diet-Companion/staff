@@ -372,6 +372,38 @@ def dependency_sets_change(f, base_dir):
     return any(before.get(k) != after.get(k) for k in DEPENDENCY_KEYS)
 
 
+def _module_key(path):
+    """A file's directory and name without its extension, lower-cased: what a case-insensitive file
+    system and an extensionless import ("./DishForm") both see."""
+    d, name = os.path.split(path)
+    return os.path.join(d.lower(), name.split(".", 1)[0].lower())
+
+
+def check_case_clash(files, base_dir=None):
+    """Refuses a change that leaves two files in one directory whose names, without the extension,
+    differ only in letter case (dishForm.ts and DishForm.tsx). Linux CI accepts them, but on macOS or
+    Windows an import resolves to the wrong file. Existing files in base_dir count too."""
+    names = {}
+    if base_dir:
+        dirs = {os.path.dirname(f["path"]) for f in files}
+        for d in dirs:
+            full = os.path.join(base_dir, d)
+            if os.path.isdir(full):
+                for entry in os.listdir(full):
+                    if os.path.isfile(os.path.join(full, entry)):
+                        names.setdefault(_module_key(os.path.join(d, entry)), set()).add(
+                            os.path.join(d, entry).split(".", 1)[0])
+    for i, f in enumerate(files):
+        if f.get("op") == "delete":
+            continue
+        stem = f["path"].split(".", 1)[0]
+        seen = names.setdefault(_module_key(f["path"]), set())
+        seen.add(stem)
+        if len(seen) > 1:
+            raise HarnessError("case_clash", f"/proposed_files/{i}/path differs from another file in its folder "
+                               "only in letter case; rename one")
+
+
 def check_developer(out, expect, base_dir=None):
     """Developer checks JSON Schema can't express (S-DEV-005, -007, -009, -021). Raises on the first failure.
 
@@ -650,11 +682,13 @@ def main():
                 raise HarnessError("input_invalid", "--input is required with --agent developer")
             result["questions_reordered"] = order_questions(out)
             check_developer(out, load_json(args.input, "input_invalid"), args.product_dir)
+            check_case_clash(out["proposed_files"], args.product_dir)
         elif args.agent.startswith("test-gen"):
             if not args.input or not args.product_dir:
                 raise HarnessError("input_invalid", "--input and --product-dir are required with --agent test-gen-*")
             result["questions_reordered"] = order_questions(out)
             check_test_gen(out, load_json(args.input, "input_invalid"), load_truth(args.product_dir))
+            check_case_clash(out["proposed_files"], args.product_dir)
         else:
             if not args.areas:
                 raise HarnessError("input_invalid", "--areas is required with --agent analyst")

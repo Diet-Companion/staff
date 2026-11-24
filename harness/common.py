@@ -30,6 +30,7 @@ REASONS = {
     "unknown_reference",
     # developer (dev_bundle.py, code_map.py, validate_output.py --agent developer, work_sandbox.py)
     "code_map_invalid", "kind_mismatch", "ticket_mismatch", "not_ready", "path_out_of_scope", "flag_missing",
+    "case_clash",
     "ac_not_ready", "sandbox_failed",
     # test engineer (qa_bundle.py, test_map.py, validate_output.py --agent test-gen-api)
     "test_map_invalid", "citation_missing", "cite_invalid",
