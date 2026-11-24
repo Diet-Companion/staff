@@ -13,7 +13,7 @@ from common import HarnessError
 from prepare_agent import build_prompt, cli_schema
 from render_architect import fenced, render, req_tickets
 from run_record import role_fields
-from validate_output import check_architect, check_schema
+from validate_output import architecture_truth, check_architect, check_schema
 
 PLUGINS = os.path.join(STAFF, "plugins")
 AGENT = os.path.join(PLUGINS, "staff-engineering", "agents", "architect.md")
@@ -180,6 +180,58 @@ class CheckArchitectTest(unittest.TestCase):
         self.decide(doc)  # a decided ADR doesn't free the other drafts' statuses
         next(a for a in doc["artifacts"] if a["type"] == "component")["status"] = "active"
         self.assert_reason(doc, "stage_violation")
+
+    def test_elements_on_main_keep_their_status_and_owner_fields(self):
+        other = f"{REPO}#33 comment 5"  # an answer on an earlier ticket, not an operator comment of this one
+        truth = {
+            "ADR-004": {"id": "ADR-004", "status": "accepted",
+                        "decision": {"outcome": "accepted", "chosen": "b", "decided_by": other}},
+            "CMP-007": {"id": "CMP-007", "status": "active"},
+            "IF-003": {"id": "IF-003", "compatibility_policy": "internal",
+                       "versions": [{"version": "1.0.0", "status": "approved"}]},
+        }
+
+        def redraft():
+            doc = load("architect-design.json")
+            adr = self.adr(doc)
+            adr["status"], adr["decision"] = "accepted", dict(truth["ADR-004"]["decision"])
+            arts = {a["id"]: a for a in doc["artifacts"]}
+            arts["CMP-007"]["status"] = "active"
+            iface = arts["IF-003"]
+            iface["compatibility_policy"] = "internal"
+            iface["versions"] = [dict(iface["versions"][0], status="approved"),
+                                 dict(iface["versions"][0], version="1.1.0", status="draft")]
+            return doc, arts
+
+        doc, _ = redraft()
+        check_architect(doc, expect_for(doc), truth=truth)
+        with self.assertRaises(HarnessError):  # without main, the same output moves statuses and owner fields
+            check_architect(doc, expect_for(doc))
+
+        def fails(reason, change):
+            doc, arts = redraft()
+            change(arts)
+            with self.assertRaises(HarnessError) as ctx:
+                check_architect(doc, expect_for(doc), truth=truth)
+            self.assertEqual(ctx.exception.reason, reason)
+
+        fails("stage_violation", lambda a: a["CMP-007"].update(status="deprecated"))
+        fails("stage_violation", lambda a: a["ADR-004"].update(status="superseded"))
+        fails("stage_violation", lambda a: a["IF-003"]["versions"][0].update(status="deprecated"))
+        fails("stage_violation", lambda a: a["IF-003"]["versions"][1].update(status="approved"))
+        fails("owner_field_set", lambda a: a["ADR-004"]["decision"].update(chosen="a"))
+        fails("owner_field_set", lambda a: a["IF-003"].update(compatibility_policy="public"))
+
+    def test_architecture_truth_reads_front_matter(self):
+        d = tempfile.mkdtemp()
+        os.makedirs(os.path.join(d, "architecture", "system", "adr"))
+        with open(os.path.join(d, "architecture", "system", "adr", "ADR-001.md"), "w") as fh:
+            fh.write("---\nid: ADR-001\nstatus: accepted\n---\n\n# ADR-001\n")
+        with open(os.path.join(d, "architecture", "system", "adr", "ADR-002.md"), "w") as fh:
+            fh.write("---\nid: [unclosed\n---\n")
+        with open(os.path.join(d, "architecture", "overview.md"), "w") as fh:
+            fh.write("# Overview\n")
+        self.assertEqual(architecture_truth(d), {"ADR-001": {"id": "ADR-001", "status": "accepted"}})
 
     def test_conflicts_specs_and_question_order(self):
         doc = load("architect-design.json")

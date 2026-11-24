@@ -11,7 +11,9 @@ shared reviewer's output against what the harness chose: the artifact type, the
 target and the reviewed commit must match the input (S-BA-017 item 5).
 """
 import argparse
+import glob
 import json
+import os
 import re
 from collections import Counter
 
@@ -164,8 +166,29 @@ def _applied(out, target, field):
                for a in out["answers_applied"])
 
 
-def check_architect(out, expect, stage=1):
-    """Architect checks JSON Schema can't express (S-ARCH-037). Raises on the first failing check."""
+def architecture_truth(product_dir):
+    """ID -> front matter of each architecture file on the product's default branch (S-ARCH-004)."""
+    truth = {}
+    for path in sorted(glob.glob(os.path.join(product_dir, "architecture", "**", "*.md"), recursive=True)):
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+        if not text.startswith("---"):
+            continue
+        try:
+            fm = yaml.safe_load(text.split("---", 2)[1])
+        except yaml.YAMLError:
+            continue
+        if isinstance(fm, dict) and isinstance(fm.get("id"), str):
+            truth[fm["id"]] = fm
+    return truth
+
+
+def check_architect(out, expect, stage=1, truth=None):
+    """Architect checks JSON Schema can't express (S-ARCH-037). Raises on the first failing check.
+
+    truth maps the IDs already on main to their front matter. An element there keeps its status, and a
+    human-owned field equal to main's value is not newly set, so a redraft can carry accepted elements."""
+    truth = truth or {}
     run, areas = expect["run"], expect["product"]["areas"]
     if out["trigger"]["kind"] != run["trigger"] or out["trigger"]["ref"] != run["intake_ref"]:
         raise HarnessError("trigger_mismatch", "/trigger is not the run's trigger kind and ref")
@@ -199,8 +222,13 @@ def check_architect(out, expect, stage=1):
         if a["comment_ref"] not in operator_refs:
             raise HarnessError("owner_field_set", f"/answers_applied/{i} does not cite an operator comment of this ticket")
     for i, a in enumerate(arts):
+        cur = truth.get(a["id"], {})
         decision = a.get("decision") if a["type"] == "adr" else None
-        if stage == 1 and decision:
+        if stage == 1 and cur and "status" in a:
+            # Already on main: the agent never moves its status (S-ARCH-011).
+            if a["status"] != cur.get("status"):
+                raise HarnessError("stage_violation", f"/artifacts/{i}/status is not its status on main")
+        elif stage == 1 and decision:
             # An answered ADR: its status follows decision.outcome, so the file the human commits passes the
             # lifecycle check, which fails an ADR merged as proposed (S-ARCH-011, -019 item 2).
             if a["status"] != decision["outcome"]:
@@ -211,13 +239,20 @@ def check_architect(out, expect, stage=1):
                 raise HarnessError("option_mismatch", f"/artifacts/{i}/decision/chosen is not one of its options")
         elif stage == 1 and a["type"] in ARCH_DRAFT_STATUS and a["status"] != ARCH_DRAFT_STATUS[a["type"]]:
             raise HarnessError("stage_violation", f"/artifacts/{i}/status is not {ARCH_DRAFT_STATUS[a['type']]} at stage 1")
-        if stage == 1 and a["type"] == "interface" and any(v["status"] != "draft" for v in a["versions"]):
-            raise HarnessError("stage_violation", f"/artifacts/{i} has an interface version that is not draft at stage 1")
+        if stage == 1 and a["type"] == "interface":
+            # New versions are drafts; a version on main keeps its status there.
+            kept = {v.get("version"): v.get("status") for v in cur.get("versions") or [] if isinstance(v, dict)}
+            for v in a["versions"]:
+                if v["status"] != kept.get(v["version"], "draft"):
+                    raise HarnessError("stage_violation",
+                                       f"/artifacts/{i} version {v['version']} is neither draft nor its status on main")
         for field in ARCH_OWNER_FIELDS.get(a["type"], []):
-            if a.get(field) is not None and not _applied(out, a["id"], field):
+            if a.get(field) is not None and a.get(field) != cur.get(field) and not _applied(out, a["id"], field):
                 raise HarnessError("owner_field_set", f"/artifacts/{i}/{field} is set without an operator answer")
+        kept_gaps = {(t.get("item"), t.get("gap_accepted_by")) for t in cur.get("testability") or [] if isinstance(t, dict)}
         for item in a.get("testability", []):
-            if item.get("gap_accepted_by") is not None and not _applied(out, a["id"], "testability"):
+            if item.get("gap_accepted_by") is not None and (item.get("item"), item["gap_accepted_by"]) not in kept_gaps \
+                    and not _applied(out, a["id"], "testability"):
                 raise HarnessError("owner_field_set", f"/artifacts/{i} accepts a testability gap without an operator answer")
 
     # Questions: blocking first, 1..n, a real recommended option; an ADR question offers that ADR's options.
@@ -357,6 +392,7 @@ def main():
     ap.add_argument("--agent", choices=["analyst", "reviewer", "architect"], default="analyst")
     ap.add_argument("--areas", help="product .staff/areas.yml (analyst)")
     ap.add_argument("--input", help="the review input file, for the expected type, target and commit (reviewer)")
+    ap.add_argument("--product-dir", help="product checkout, for the architecture already on main (architect)")
     ap.add_argument("--strip-prefix", action="append", default=[], metavar="/DIR/=REPL",
                     help="rewrite an absolute checkout prefix in the output, e.g. /w/head/=head: (reviewer)")
     ap.add_argument("--max-run-usd", type=float, required=True)
@@ -383,7 +419,8 @@ def main():
         elif args.agent == "architect":
             if not args.input:
                 raise HarnessError("input_invalid", "--input is required with --agent architect")
-            check_architect(out, load_json(args.input, "input_invalid"), args.stage)
+            truth = architecture_truth(args.product_dir) if args.product_dir else {}
+            check_architect(out, load_json(args.input, "input_invalid"), args.stage, truth)
         else:
             if not args.areas:
                 raise HarnessError("input_invalid", "--areas is required with --agent analyst")
