@@ -293,6 +293,18 @@ def check_architect(out, expect, stage=1, truth=None):
             raise HarnessError("spec_invalid", f"/spec_versions/{i}/document has no openapi version")
 
 
+def order_questions(out):
+    """Blocking questions first, then priorities renumbered 1..n, keeping the model's order otherwise.
+
+    Order and numbering are presentation, not content, so the harness fixes them instead of failing
+    the run (live run 45371316724, as sort_findings for the reviewer). Returns True when anything changed."""
+    before = [(q["id"], q["priority"]) for q in out["questions"]]
+    out["questions"].sort(key=lambda q: (not q["blocking"], q["priority"]))
+    for i, q in enumerate(out["questions"], start=1):
+        q["priority"] = i
+    return [(q["id"], q["priority"]) for q in out["questions"]] != before
+
+
 def check_questions(questions):
     """Blocking first, priorities 1..n, a real recommended option (S-BA-014)."""
     seen_non_blocking = False
@@ -492,6 +504,7 @@ def main():
         elif args.agent == "developer":
             if not args.input:
                 raise HarnessError("input_invalid", "--input is required with --agent developer")
+            result["questions_reordered"] = order_questions(out)
             check_developer(out, load_json(args.input, "input_invalid"))
         else:
             if not args.areas:
