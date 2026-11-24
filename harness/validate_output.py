@@ -20,6 +20,7 @@ from collections import Counter
 import yaml
 from jsonschema import Draft202012Validator
 
+from code_map import FLAGGED, classify, forbidden
 from common import HarnessError, load_json, run_main, write_json
 from contract import load_areas
 
@@ -292,6 +293,73 @@ def check_architect(out, expect, stage=1, truth=None):
             raise HarnessError("spec_invalid", f"/spec_versions/{i}/document has no openapi version")
 
 
+def check_questions(questions):
+    """Blocking first, priorities 1..n, a real recommended option (S-BA-014)."""
+    seen_non_blocking = False
+    for i, q in enumerate(questions):
+        if q["blocking"] and seen_non_blocking:
+            raise HarnessError("blocking_order", f"/questions/{i} is blocking but follows a non-blocking question")
+        seen_non_blocking = seen_non_blocking or not q["blocking"]
+        if q["priority"] != i + 1:
+            raise HarnessError("blocking_order", f"/questions/{i}/priority is not {i + 1}")
+        if q["recommended"] not in {o["id"] for o in q["options"]}:
+            raise HarnessError("recommended_not_option", f"/questions/{i}/recommended")
+
+
+def check_developer(out, expect):
+    """Developer checks JSON Schema can't express (S-DEV-005, -007, -009, -021). Raises on the first failure.
+
+    expect is the bundled input: `run` and the harness-made `developer` section. Changed
+    lines are capped later, in the work sandbox, where the base exists to diff against."""
+    run, dev = expect["run"], expect.get("developer") or {}
+    kind, work, entry = dev.get("ticket_kind"), dev.get("work"), dev.get("code_map_entry")
+    readiness = dev.get("readiness") or {}
+    pr, files = out["pr"], out["proposed_files"]
+    check_questions(out["questions"])
+    if kind == "bootstrap":
+        if out["code_map"] is None or files:
+            raise HarnessError("kind_mismatch", "a dev:bootstrap run drafts code_map and proposes no files")
+        if out["code_map"]["area"] != dev.get("area"):
+            raise HarnessError("unknown_area", "/code_map/area is not the ticket's area")
+    elif out["code_map"] is not None:
+        raise HarnessError("kind_mismatch", "/code_map is set on a ticket that is not dev:bootstrap")
+    if (kind == "fix") != (out["classification"] is not None):
+        raise HarnessError("kind_mismatch", "/classification is set exactly on dev:fix tickets (S-DEV-017)")
+    if pr is None:
+        return
+    if readiness.get("status") != "ready" or entry is None:
+        raise HarnessError("not_ready", "code is proposed for a ticket that is not ready or has no code-map entry")
+    if pr["kind"] != {"implement": work, "fix": "fix"}.get(kind):
+        raise HarnessError("kind_mismatch", "/pr/kind does not match the ticket")
+    if pr["ticket"] != run["intake_ref"]:
+        raise HarnessError("ticket_mismatch", "/pr/ticket is not this ticket")
+    live = set(readiness.get("acs") or [])
+    for i, a in enumerate(pr["implements_acs"]):
+        if a["ac"] not in live:
+            raise HarnessError("ac_not_ready", f"/pr/implements_acs/{i} is not one of the ticket's ready ACs")
+    if pr["kind"] == "feature" and not pr["implements_acs"]:
+        raise HarnessError("ac_not_ready", "a feature change declares no AC (S-DEV-009)")
+    if pr["kind"] == "refactor" and pr["implements_acs"]:
+        raise HarnessError("kind_mismatch", "a refactor declares no AC (S-DEV-007)")
+
+    # Path scope (S-DEV-005): the area's source and unit tests; flagged classes need flags (S-DEV-018).
+    seen, flagged, deps = set(), set(), False
+    for i, f in enumerate(files):
+        if f["path"] in seen:
+            raise HarnessError("duplicate_id", f"/proposed_files/{i}/path is proposed twice")
+        seen.add(f["path"])
+        for p in [f["path"]] + ([f["from"]] if f.get("from") else []):
+            cls = classify(p, entry)
+            if forbidden(p) or "generated" in cls or not cls & {"source", "unit_tests", *FLAGGED}:
+                raise HarnessError("path_out_of_scope", f"/proposed_files/{i} is outside the area's code-map scope")
+            flagged |= cls & set(FLAGGED)
+            deps |= "dependency_files" in cls
+    if flagged and not pr["flags"]:
+        raise HarnessError("flag_missing", f"{', '.join(sorted(flagged))} paths change without a /pr/flags entry")
+    if deps and not pr["dependencies"]:
+        raise HarnessError("flag_missing", "a dependency file changes without a /pr/dependencies entry")
+
+
 def sort_findings(out):
     """Order findings blocker first (S-BA-032), keeping the model's order within a severity.
 
@@ -389,7 +457,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--envelope", required=True, help="stdout of claude -p --output-format json")
     ap.add_argument("--schema", required=True, help="the full read-stage schema")
-    ap.add_argument("--agent", choices=["analyst", "reviewer", "architect"], default="analyst")
+    ap.add_argument("--agent", choices=["analyst", "reviewer", "architect", "developer"], default="analyst")
     ap.add_argument("--areas", help="product .staff/areas.yml (analyst)")
     ap.add_argument("--input", help="the review input file, for the expected type, target and commit (reviewer)")
     ap.add_argument("--product-dir", help="product checkout, for the architecture already on main (architect)")
@@ -421,6 +489,10 @@ def main():
                 raise HarnessError("input_invalid", "--input is required with --agent architect")
             truth = architecture_truth(args.product_dir) if args.product_dir else {}
             check_architect(out, load_json(args.input, "input_invalid"), args.stage, truth)
+        elif args.agent == "developer":
+            if not args.input:
+                raise HarnessError("input_invalid", "--input is required with --agent developer")
+            check_developer(out, load_json(args.input, "input_invalid"))
         else:
             if not args.areas:
                 raise HarnessError("input_invalid", "--areas is required with --agent analyst")
@@ -433,6 +505,14 @@ def main():
         result.update(ok=True, outcome=out["outcome"])
         summary = (f"outcome={out['outcome']}, {len(out['artifacts'])} artifacts, "
                    f"{len(out['questions'])} questions, {len(out['defect_items'])} defect items")
+    elif args.agent == "developer":
+        # The repo is public: private reports never reach an artifact or a comment (S-DEV-019).
+        out["private_reports_withheld"] = [{"id": r["id"], "kind": r["kind"]} for r in out["private_reports"]]
+        out["private_reports"] = []
+        outcome = "proposed" if out["pr"] else "code_map" if out["code_map"] else "no_code"
+        result.update(ok=True, outcome=outcome)
+        summary = (f"outcome={outcome}, {len(out['proposed_files'])} files, {len(out['questions'])} questions, "
+                   f"{len(out['design_requests'])} design requests, {len(out['defect_items'])} defect items")
     elif args.agent == "reviewer":
         result.update(ok=True, outcome=out["verdict"])
         summary = (f"verdict={out['verdict']}, {len(out['findings'])} findings, "

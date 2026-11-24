@@ -14,7 +14,7 @@ Every file under `.staff/` is human-only, apart from `.staff/plugins.lock`, whic
 | `.staff/areas.yml` | Path-to-area map. Areas key requirement and rule paths, concurrency groups and stages (S-GEN-060) | GEN, all roles | **Yes** |
 | `.staff/plugins.lock` | Exact pinned version of every installed plugin, and exactly one staff-core. Release tags only, never floating (S-GEN-016) | GEN | No. In the lean slice, pin the tag in the marketplace source instead (see `README.md`) |
 | `.staff/stages.yml` | Human-set stage per agent per area; role priority order (S-GEN-050, S-GEN-072) | GEN | No. The Analyst is at stage 1 by default |
-| `.staff/code.yml` | DEV code map per area: `source`, `unit_tests`, `generated`, `protected`, `dependency_files`, `verification_config`, `guard_patterns`, `test_list`, `generators`, `interface_source`, `upkeep_tools` (S-DEV-004) | DEV | No |
+| `.staff/code.yml` | DEV code map per area: `source`, `unit_tests`, `generated`, `protected`, `dependency_files`, `verification_config`, `guard_patterns`, `test_list`, `generators`, `interface_source`, `upkeep_tools` (S-DEV-004); optional `sandbox` commands for the stage-1 work sandbox. Schema: `plugins/staff-engineering/schemas/code-map.schema.json` | DEV | No |
 | `.staff/tests.yml` | QA test map per area and layer: `paths`, `stack`, `locators`, `mocks`, `request_docs`, `fixtures`, `mutation`, `fuzz` (S-QA-005) | QA | No |
 | `.staff/delivery.yml` | DEVOPS delivery map: `pipelines`, `build`, `iac`, `environments`, `deploy_units`, `migrations`, `monitors`, `load`, `pin_tool`, `fork`, `exports` (S-DEVOPS-004) | DEVOPS | No |
 

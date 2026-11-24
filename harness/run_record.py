@@ -63,6 +63,22 @@ def role_fields(validated):
             "drift_ids": [q["drift_id"] for q in validated["questions"] if q.get("drift_id")],
             "question_ids": [q["id"] for q in validated["questions"]],
         }
+    if validated.get("agent") == "developer":
+        pr = validated["pr"] or {}
+        return {
+            "kind": pr.get("kind"),
+            "ac_ids": [a["ac"] for a in pr.get("implements_acs") or []],
+            "if_versions": list(pr.get("implements") or []),
+            "files": len(validated["proposed_files"]),
+            "flags": len(pr.get("flags") or []),
+            "dependencies": len(pr.get("dependencies") or []),
+            "classification": (validated["classification"] or {}).get("kind"),
+            "code_map_area": (validated["code_map"] or {}).get("area"),
+            "design_requests": len(validated["design_requests"]),
+            "defect_items_raised": len(validated["defect_items"]),
+            "private_reports": len(validated.get("private_reports_withheld") or []),
+            "question_ids": [q["id"] for q in validated["questions"]],
+        }
     if validated.get("agent") == "reviewer":
         return {
             "artifact_type": validated["artifact_type"],
