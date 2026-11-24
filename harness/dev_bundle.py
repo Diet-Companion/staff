@@ -99,7 +99,9 @@ def readiness(truth, kind, body, operator):
                     blockers.append(f"{ac} is retired or does not exist")
                 elif ac not in acs:
                     acs.append(ac)
-            for qid in [rid] * (req.get("type") == "quality") + list(req.get("quality") or []):
+            # `quality` is a list of quality REQ IDs, or `{none: <reason>}` when no quality target applies.
+            linked = req.get("quality") if isinstance(req.get("quality"), list) else []
+            for qid in [rid] * (req.get("type") == "quality") + linked:
                 if not accepted_qas_for(truth, qid):
                     blockers.append(f"{qid} has no accepted QAS, so the design of {rid} is pending (S-ARCH-015)")
     elif kind == "fix":

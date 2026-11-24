@@ -59,6 +59,9 @@ def product():
                                 {"id": "REQ-012/AC-003", "status": "retired"}]}))
     write(d, "requirements/orders/REQ-013.md", fm({"id": "REQ-013", "type": "story", "status": "draft",
                                                     "acceptance_criteria": [{"id": "REQ-013/AC-001"}]}))
+    write(d, "requirements/orders/REQ-014.md", fm({
+        "id": "REQ-014", "type": "story", "status": "ready", "quality": {"none": "No quality target applies."},
+        "acceptance_criteria": [{"id": "REQ-014/AC-001"}]}))
     write(d, "requirements/orders/REQ-020.md", fm({"id": "REQ-020", "type": "quality", "status": "ready",
                                                     "acceptance_criteria": [{"id": "REQ-020/AC-001"}]}))
     write(d, "requirements/orders/REQ-021.md", fm({"id": "REQ-021", "type": "quality", "status": "ready",
@@ -120,6 +123,8 @@ class ReadinessTest(unittest.TestCase):
         self.assertEqual((status, d["acs"], d["blockers"]), ("ready", ["REQ-012/AC-001", "REQ-012/AC-002"], []))
         status, d = self.check("implement", "REQ-012")  # a whole requirement: its live ACs
         self.assertEqual((status, d["acs"]), ("ready", ["REQ-012/AC-001", "REQ-012/AC-002"]))
+        status, d = self.check("implement", "REQ-014")  # `quality: {none: ...}` links no quality requirement
+        self.assertEqual((status, d["blockers"]), ("ready", []))
 
     def test_waiting(self):
         for body, hint in (("REQ-012/AC-003", "retired"), ("REQ-013/AC-001", "not ready"), ("REQ-099/AC-001", "exist"),
