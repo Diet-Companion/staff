@@ -109,9 +109,14 @@ def render_interface(a, specs):
             "", "| Version | Status | Spec |", "| --- | --- | --- |"]
     out += [f"| {esc(v['version'])} | {esc(v['status'])} | {esc(v['spec'])} |" for v in a["versions"]]
     out.append("")
+    declared = {v["version"]: v["spec"] for v in a["versions"]}
     for s in specs:
-        ext = SPEC_EXT.get(s["format"].lower(), "txt")
-        path = f"architecture/{a['area']}/interfaces/{a['id']}/{s['version']}.{ext}"
+        # The path the interface file points at, so the proposed files agree. Only a path inside this
+        # interface's own folder is trusted; anything else falls back to <version>.<ext> there.
+        base = f"architecture/{a['area']}/interfaces/{a['id']}/"
+        path = declared.get(s["version"], "")
+        if not (path.startswith(base) and re.fullmatch(r"[A-Za-z0-9._/-]+", path) and ".." not in path):
+            path = f"{base}{s['version']}.{SPEC_EXT.get(s['format'].lower(), 'txt')}"
         out += [f"<details><summary>Proposed spec <code>{esc(path)}</code> ({esc(s['format'])})</summary>", "",
                 fenced(s["document"]), "", "</details>", ""]
     return out
