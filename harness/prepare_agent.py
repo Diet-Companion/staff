@@ -109,7 +109,13 @@ DEVELOPER_CONTRACT = """\
   `sandbox` commands on the base and on your change, and posts the result: build, tests
   that newly fail, and your added tests (S-DEV-042). Write complete files that build as
   they stand. Never propose lockfiles or other `generated` paths by hand: name the
-  generator in `decision_summary` (S-DEV-043).
+  generator in `decision_summary` (S-DEV-043). The sandbox runs the code map's
+  generators on your change before it installs anything, so a new dependency in a
+  manifest is fine: list it in `pr.dependencies` and the lockfile follows.
+- **No secret-like strings.** The output is redaction-checked and dropped whole on a hit
+  (S-SEC-004): no realistic-looking keys or tokens, no base64 fixtures, no other long
+  mixed-case strings with digits. Build test bytes in code (`new Uint8Array(16)`,
+  `Uint8Array.from([0x89, 0x50])`) and use obviously fake values (`"test-key"`).
 - **Output.** Return your one JSON object by calling the StructuredOutput tool exactly
   once. Write nothing else. The harness validates it and rejects anything else
   (S-SEC-003).
