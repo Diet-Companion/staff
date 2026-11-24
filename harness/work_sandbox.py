@@ -30,6 +30,8 @@ MAX_LINES = 500           # S-DEV-010 starting value
 CMD_TIMEOUT = 15 * 60     # seconds per command
 MAX_REPORT_BYTES = 5_000_000
 TEST_ID_MAX = 300
+TAIL_LINES, TAIL_WIDTH, MESSAGE_MAX, MESSAGES_MAX = 40, 200, 300, 10
+ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 CLEAN_ENV_KEYS = ("PATH", "HOME", "LANG", "TMPDIR", "RUNNER_TEMP")
 
 
@@ -68,6 +70,22 @@ def apply_files(repo, files):
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8", newline="") as fh:
             fh.write("".join(f["content"]))
+
+
+def clean_line(line, root):
+    """One log line made safe to show: no ANSI or control characters, no runner path, bounded."""
+    line = ANSI_RE.sub("", line).replace(os.path.realpath(root) + "/", "").replace(root.rstrip("/") + "/", "")
+    return "".join(c for c in line if c == "\t" or ord(c) >= 32)[:TAIL_WIDTH]
+
+
+def output_tail(log, start, root):
+    """The last lines a command wrote to the log after byte offset start, cleaned."""
+    with open(log, encoding="utf-8", errors="replace") as fh:
+        fh.seek(start)
+        raw = fh.read().splitlines()
+    header = next((i for i, x in enumerate(raw) if x.startswith("$ ")), -1)  # the "$ <command>" line sh() wrote
+    lines = [clean_line(x, root) for x in raw[header + 1:]]
+    return [x for x in lines if x.strip()][-TAIL_LINES:]
 
 
 def sh(cmd, cwd, log, timeout=CMD_TIMEOUT):
@@ -125,6 +143,27 @@ def cmd_apply(args):
     print(f"applied: {len(files)} files, {lines} changed lines (cap {MAX_LINES}), {len(ran)} generators run")
 
 
+def junit_messages(path, ids):
+    """{test_id: first line of its failure message} for the given failing tests, cleaned."""
+    try:
+        if os.path.getsize(path) > MAX_REPORT_BYTES:
+            return {}
+        root = ET.parse(path).getroot()
+    except (OSError, ET.ParseError):
+        return {}
+    out = {}
+    for case in root.iter("testcase"):
+        tid = f"{case.get('classname') or case.get('file') or ''}::{case.get('name') or ''}"[:TEST_ID_MAX]
+        if tid not in ids or tid in out or len(out) >= MESSAGES_MAX:
+            continue
+        for child in case:
+            if child.tag in ("failure", "error"):
+                text = (child.get("message") or child.text or "").strip().splitlines()
+                out[tid] = clean_line(text[0] if text else child.tag, "/nonexistent")[:MESSAGE_MAX] or child.tag
+                break
+    return out
+
+
 def junit_results(path):
     """{test_id: passed} from a JUnit XML report, or None when it is missing or unreadable."""
     try:
@@ -145,15 +184,21 @@ def junit_results(path):
 
 
 def run_side(repo, sandbox, log):
-    """(build_ok, results or None) for one checkout."""
+    """(build_ok, results or None, failure or None) for one checkout."""
     report = os.path.join(repo, sandbox["unit_report"])
     if os.path.exists(report):
         os.remove(report)
-    for cmd in sandbox["setup"] + sandbox["build"]:
-        if not sh(cmd, repo, log):
-            return False, None
+    for step, cmds in (("setup", sandbox["setup"]), ("build", sandbox["build"])):
+        for cmd in cmds:
+            start = os.path.getsize(log) if os.path.exists(log) else 0
+            if not sh(cmd, repo, log):
+                return False, None, {"step": step, "command": cmd, "tail": output_tail(log, start, repo)}
+    start = os.path.getsize(log) if os.path.exists(log) else 0
     sh(sandbox["unit_test"], repo, log)
-    return True, junit_results(report)
+    results = junit_results(report)
+    if results is None:
+        return True, None, {"step": "report", "command": sandbox["unit_test"], "tail": output_tail(log, start, repo)}
+    return True, results, None
 
 
 def cmd_test(args):
@@ -164,9 +209,9 @@ def cmd_test(args):
         write_json(args.out, {"version": 1, "status": "untested", "reason": "no sandbox commands in .staff/code.yml"})
         print("untested: the code map has no sandbox commands")
         return
-    base_build, base = run_side(args.base, sandbox, os.path.join(args.out_dir, "base.log"))
+    base_build, base, _ = run_side(args.base, sandbox, os.path.join(args.out_dir, "base.log"))
     head_log = os.path.join(args.out_dir, "head.log")
-    head_build, head = run_side(args.head, sandbox, head_log)
+    head_build, head, failure = run_side(args.head, sandbox, head_log)
     base, head_res = base or {}, head or {}
     regressions = sorted(t for t, ok in head_res.items() if not ok and base.get(t) is True)
     flaky = []
@@ -183,10 +228,13 @@ def cmd_test(args):
         status = "fail"  # the build passed but no test report was written
     else:
         status = "fail" if regressions or added_failing else "pass"
+    messages = junit_messages(os.path.join(args.head, sandbox["unit_report"]), set(regressions + added_failing))
     write_json(args.out, {
         "version": 1, "status": status,
         "build": {"base": base_build, "head": head_build},
         "report": {"head": head is not None},
+        "failure": failure,
+        "messages": messages,
         "tests": {"base_total": len(base), "head_total": len(head_res), "added": len(added),
                   "regressions": regressions[:50], "flaky": flaky[:50], "added_failing": added_failing[:50],
                   "base_failing": sorted(t for t, ok in base.items() if not ok)[:50]},
@@ -197,10 +245,29 @@ def cmd_test(args):
 
 # The write stage reads the test result as data from a job that ran proposed code: only these shapes pass.
 TEST_ID_RE = re.compile(r"^[^\x00-\x1f]{1,300}$")
+LINE_RE = re.compile(r"^[^\x00-\x08\x0a-\x1f]{0,200}$")
 
 
-def check_result(data):
-    """Strict shape check of a `test` result before anything renders it."""
+def check_failure(f, commands):
+    """A head failure: a step, one of the code map's own commands, and a bounded, clean tail."""
+    if f is None:
+        return True
+    return (isinstance(f, dict) and set(f) == {"step", "command", "tail"}
+            and f["step"] in ("setup", "build", "report") and f["command"] in commands
+            and isinstance(f["tail"], list) and len(f["tail"]) <= TAIL_LINES
+            and all(isinstance(x, str) and LINE_RE.match(x) for x in f["tail"]))
+
+
+def check_messages(m, ids):
+    return (isinstance(m, dict) and len(m) <= MESSAGES_MAX
+            and all(k in ids and isinstance(v, str) and 0 < len(v) <= MESSAGE_MAX and TEST_ID_RE.match(v)
+                    for k, v in m.items()))
+
+
+def check_result(data, sandbox=None):
+    """Strict shape check of a `test` result before anything renders it.
+
+    sandbox is the code map's sandbox block, when known: a failure must name one of its commands."""
     def ids(v):
         return isinstance(v, list) and len(v) <= 50 and all(isinstance(t, str) and TEST_ID_RE.match(t) for t in v)
     if not isinstance(data, dict) or data.get("version") != 1:
@@ -212,7 +279,15 @@ def check_result(data):
             and all(isinstance(b.get(k), bool) for k in ("base", "head"))
             and isinstance((data.get("report") or {}).get("head"), bool)
             and all(isinstance(t.get(k), int) and 0 <= t[k] < 10**6 for k in ("base_total", "head_total", "added"))
-            and all(ids(t.get(k)) for k in ("regressions", "flaky", "added_failing", "base_failing")))
+            and all(ids(t.get(k)) for k in ("regressions", "flaky", "added_failing", "base_failing"))
+            and check_failure(data.get("failure"), commands(sandbox))
+            and check_messages(data.get("messages", {}), set(t["regressions"]) | set(t["added_failing"])))
+
+
+def commands(sandbox):
+    if not sandbox:
+        return set()
+    return set(sandbox["setup"]) | set(sandbox["build"]) | {sandbox["unit_test"]}
 
 
 def main():

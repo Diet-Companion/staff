@@ -80,11 +80,11 @@ def render_files(applied, proposed):
     return out + [""]
 
 
-def render_sandbox(result):
+def render_sandbox(result, sandbox_cmds):
     out = ["#### Work sandbox (S-DEV-042)", ""]
     if result is None:
         return out + ["No result: the sandbox job didn't finish. See the run's logs.", ""]
-    if not check_result(result):
+    if not check_result(result, sandbox_cmds):
         return out + ["The sandbox result failed the harness's shape check, so it isn't shown.", ""]
     if result["status"] == "untested":
         return out + ["Not tested: `.staff/code.yml` has no `sandbox` commands for this area.", ""]
@@ -95,10 +95,18 @@ def render_sandbox(result):
             f"({t['added']} added), {t['base_total']} on the base."]
     if b["head"] and not result["report"]["head"]:
         out.append("No JUnit report was written on the change.")
+    messages = result.get("messages") or {}
     for key, label in (("added_failing", "Added tests that fail"), ("regressions", "Tests that pass on the base and fail on the change"),
                        ("flaky", "Failed, then passed on a re-run (flaky)"), ("base_failing", "Already failing on the base")):
         if t[key]:
-            out += ["", f"{label}:", ""] + [f"- `{esc(x)}`" for x in t[key]]
+            out += ["", f"{label}:", ""] + [f"- `{esc(x)}`" + (f": {esc(messages[x])}" if x in messages else "")
+                                            for x in t[key]]
+    f = result.get("failure")
+    if f:
+        step = {"setup": "Setup", "build": "The build", "report": "The test run"}[f["step"]]
+        what = "wrote no JUnit report" if f["step"] == "report" else "failed"
+        out += ["", f"{step} {what} on the change: `{esc(f['command'])}`. Its last output lines:", "",
+                fenced("\n".join(f["tail"]) or "(no output)")]
     return out + ["", "The tests ran the proposed code on the sandbox runner, so treat this result as advisory.", ""]
 
 
@@ -112,7 +120,7 @@ def render_main(data, meta, applied, sandbox, args):
         out += ["#### Blockers (S-DEV-007)", ""] + [f"- {esc(b)}" for b in r["blockers"]] + [""]
     if data["pr"]:
         out += render_pr(data["pr"]) + render_files(applied, data["proposed_files"])
-        out += render_sandbox(sandbox)
+        out += render_sandbox(sandbox, (meta.get("code_map_entry") or {}).get("sandbox"))
         if args.patch_artifact and args.run_url:
             out += [f"Patch: the `{esc(args.patch_artifact)}` artifact of [this run]({args.run_url}).", ""]
     if data["code_map"]:

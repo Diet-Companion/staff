@@ -17,7 +17,7 @@ from prepare_agent import build_prompt
 from render_developer import render
 from run_record import role_fields
 from validate_output import check_developer, check_schema
-from work_sandbox import check_result, junit_results
+from work_sandbox import check_result, clean_line, junit_results
 
 PLUGINS = os.path.join(STAFF, "plugins")
 AGENT = os.path.join(PLUGINS, "staff-engineering", "agents", "developer.md")
@@ -317,7 +317,7 @@ class SandboxTest(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         with open(out) as fh:
             data = json.load(fh)
-        self.assertTrue(check_result(data))
+        self.assertTrue(check_result(data, sandbox))
         return data
 
     def test_results(self):
@@ -327,11 +327,15 @@ class SandboxTest(unittest.TestCase):
         self.assertEqual((data["status"], data["tests"]["added"], data["tests"]["head_total"]), ("pass", 1, 2))
         data = self.run_test(a, fail_a + b)
         self.assertEqual((data["status"], data["tests"]["regressions"]), ("fail", ["t.py::a"]))
-        data = self.run_test(a, a + '<testcase classname="t.py" name="b"><error/></testcase>')
+        data = self.run_test(a, a + '<testcase classname="t.py" name="b"><failure message="expected 1 to be 2&#10;more"/></testcase>')
         self.assertEqual((data["status"], data["tests"]["added_failing"]), ("fail", ["t.py::b"]))
+        self.assertEqual(data["messages"], {"t.py::b": "expected 1 to be 2"})
         data = self.run_test(fail_a, fail_a)
         self.assertEqual((data["status"], data["tests"]["base_failing"]), ("pass", ["t.py::a"]))
-        self.assertEqual(self.run_test(a, a, build="false")["status"], "fail")
+        data = self.run_test(a, a, build="echo 'src/x.ts(5,13): error TS2769' && false")
+        self.assertEqual(data["status"], "fail")
+        self.assertEqual((data["failure"]["step"], data["failure"]["tail"]), ("build", ["src/x.ts(5,13): error TS2769"]))
+        self.assertFalse(check_result(data))  # without the code map, a failure's command is unknown
 
     def test_result_shape_check(self):
         good = {"version": 1, "status": "pass", "build": {"base": True, "head": True}, "report": {"head": True},
@@ -346,6 +350,24 @@ class SandboxTest(unittest.TestCase):
             self.assertFalse(check_result(bad))
         self.assertTrue(check_result({"version": 1, "status": "untested",
                                       "reason": "no sandbox commands in .staff/code.yml"}))
+
+    def test_clean_line(self):
+        self.assertEqual(clean_line("\x1b[31m/w/head/src/a.ts\x07 bad\x1b[0m", "/w/head"), "src/a.ts bad")
+        self.assertEqual(len(clean_line("x" * 500, "/r")), 200)
+
+    def test_failure_shape(self):
+        sandbox = {"setup": ["npm ci"], "build": ["npm run build"], "unit_test": "npm test", "unit_report": "r.xml"}
+        base = {"version": 1, "status": "fail", "build": {"base": True, "head": False}, "report": {"head": False},
+                "tests": {"base_total": 0, "head_total": 0, "added": 0, "regressions": [], "flaky": [],
+                          "added_failing": [], "base_failing": []},
+                "failure": {"step": "build", "command": "npm run build", "tail": ["error TS1"]}, "messages": {}}
+        self.assertTrue(check_result(base, sandbox))
+        for mutate in (lambda d: d["failure"].update(command="curl evil"), lambda d: d["failure"].update(tail=["a\nb"]),
+                       lambda d: d["failure"].update(tail=["x"] * 41), lambda d: d["failure"].update(step="deploy"),
+                       lambda d: d.update(messages={"t::not-failing": "m"})):
+            bad = copy.deepcopy(base)
+            mutate(bad)
+            self.assertFalse(check_result(bad, sandbox))
 
     def test_junit_unreadable(self):
         d = tempfile.mkdtemp()
@@ -390,6 +412,19 @@ class RenderTest(unittest.TestCase):
         main = dict(render(out, META, APPLIED, tampered, Args, {})[0])["00-main.md"]
         self.assertIn("failed the harness's shape check", main)
         self.assertNotIn("### Approved", main)
+
+    def test_failure_tail_is_fenced(self):
+        sandbox = {"setup": ["npm ci"], "build": ["npm run typecheck"], "unit_test": "npm test", "unit_report": "r.xml"}
+        result = {"version": 1, "status": "fail", "build": {"base": False, "head": False}, "report": {"head": False},
+                  "tests": {"base_total": 0, "head_total": 0, "added": 0, "regressions": [], "flaky": [],
+                            "added_failing": [], "base_failing": []},
+                  "failure": {"step": "build", "command": "npm run typecheck",
+                              "tail": ["vite.config.ts(5,13): error TS2769", "```", "@giokur [x](http://e)"]}, "messages": {}}
+        meta = dict(META, code_map_entry=dict(ENTRY, sandbox=sandbox))
+        main = dict(render(load("developer-feature.json"), meta, APPLIED, result, Args, {})[0])["00-main.md"]
+        self.assertIn("The build failed on the change: `npm run typecheck`", main)
+        self.assertIn("````\nvite.config.ts(5,13): error TS2769", main)  # a longer fence than the tail's ```
+        self.assertNotIn("\n@giokur", main.split("````")[0])
 
     def test_bootstrap_and_waiting(self):
         boot = load("developer-bootstrap.json")
