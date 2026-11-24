@@ -23,6 +23,8 @@ from jsonschema import Draft202012Validator
 from code_map import FLAGGED, classify, forbidden
 from common import HarnessError, load_json, run_main, write_json
 from contract import load_areas
+from dev_bundle import live_acs, load_truth
+from test_map import is_test_file, writable
 
 SUBTYPE_REASONS = {"error_max_turns": "max_turns", "error_max_budget_usd": "budget_exceeded"}
 
@@ -424,6 +426,93 @@ def check_developer(out, expect, base_dir=None):
         raise HarnessError("flag_missing", "a dependency file changes without a /pr/dependencies entry")
 
 
+CITE_RE = re.compile(r"\bcites:\s*([^\n]*)")
+CITE_TOKEN = re.compile(r"^(REQ-\d{3,}/AC-\d{3,}|R-\d{3,}|IF-\d{3,}@\d+\.\d+\.\d+(#[^\s#,]{1,200})?|ADR-\d{3,}/C-\d{3,}|QAS-\d{3,})$")
+
+
+def cite_live(cid, truth):
+    """True when a test citation resolves to a live source on main (S-QA-010)."""
+    if "/AC-" in cid:
+        req = truth["reqs"].get(cid.split("/")[0]) or {}
+        return req.get("status") == "ready" and cid in live_acs(req)
+    if cid.startswith("R-"):
+        return (truth["rules"].get(cid) or {}).get("status") == "active"
+    if cid.startswith("IF-"):
+        iid, rest = cid.split("@", 1)
+        version = rest.split("#", 1)[0]
+        return any(isinstance(v, dict) and v.get("version") == version and v.get("status") in ("approved", "deprecated")
+                   for v in (truth["arch"].get(iid) or {}).get("versions") or [])
+    if cid.startswith("ADR-"):
+        return (truth["arch"].get(cid.split("/")[0]) or {}).get("status") == "accepted"
+    return (truth["arch"].get(cid) or {}).get("status") == "accepted"  # QAS-n
+
+
+def file_citations(text, test_decl):
+    """(cited IDs, index of the first test declaration with no citation within 3 lines above, or None)."""
+    lines = text.splitlines()
+    cited, uncited = [], None
+    for line in lines:
+        for m in CITE_RE.finditer(line):
+            cited += [c.strip().rstrip(".;") for c in m.group(1).split(",") if c.strip()]
+    for i, line in enumerate(lines):
+        if any(re.search(p, line) for p in test_decl):
+            above = lines[max(0, i - 3):i]
+            if not any("cites:" in a or "characterization" in a for a in above) and uncited is None:
+                uncited = i + 1
+    return cited, uncited
+
+
+def check_test_gen(out, expect, truth):
+    """test-gen checks JSON Schema can't express (S-QA-006, -007, -010, -014, -026). Raises on the first failure.
+
+    expect is the bundled input: `run` and the harness-made `qa` section. truth is the product's
+    requirements, rules and architecture on main (dev_bundle.load_truth)."""
+    qa = expect.get("qa") or {}
+    entry, readiness = qa.get("test_map_entry"), qa.get("readiness") or {}
+    pr, files = out["pr"], out["proposed_files"]
+    check_questions(out["questions"])
+    if pr is None:
+        return
+    if readiness.get("status") != "ready" or entry is None:
+        raise HarnessError("not_ready", "tests are proposed for a ticket that is not ready or has no test-map entry")
+    if pr["layer"] != qa.get("layer"):
+        raise HarnessError("kind_mismatch", "/pr/layer is not the ticket's layer")
+    code_entry = qa.get("code_map_entry") or {}
+    test_decl = [p for g in code_entry.get("guard_patterns") or [] if g.get("stack") == entry.get("stack")
+                 for p in g.get("test_decl") or []]
+
+    # Path scope (S-QA-014): the layer's writable globs only, never product code or a code-map class.
+    seen, cited = set(), list(pr["cited_ids"])
+    for i, f in enumerate(files):
+        if f["path"] in seen:
+            raise HarnessError("duplicate_id", f"/proposed_files/{i}/path is proposed twice")
+        seen.add(f["path"])
+        if f["op"] in ("delete", "rename"):
+            raise HarnessError("path_out_of_scope", f"/proposed_files/{i} deletes or renames a file (tests are never removed)")
+        if forbidden(f["path"]) or classify(f["path"], code_entry) or not writable(f["path"], entry):
+            raise HarnessError("path_out_of_scope", f"/proposed_files/{i} is outside the layer's test-map scope")
+        if is_test_file(f["path"], entry):
+            found, uncited = file_citations("".join(f["content"]), test_decl)
+            if uncited is not None:
+                raise HarnessError("citation_missing", f"/proposed_files/{i} has a test at line {uncited} with no "
+                                   "`cites:` or `characterization` comment above it (S-QA-007)")
+            cited += found
+    if not test_decl:
+        raise HarnessError("citation_missing", "the code map has no test_decl pattern for the layer's stack")
+
+    # Every citation resolves to a live source on main (S-QA-010).
+    for c in sorted(set(cited)):
+        if not CITE_TOKEN.match(c) or not cite_live(c, truth):
+            raise HarnessError("cite_invalid", f"{c[:80]} is not a ready AC, active rule, approved version, "
+                               "accepted ADR constraint or accepted QAS")
+
+    # Expected failures and suspected issues pair up (S-QA-009).
+    expected = {e["test_id"] for e in pr["expected_failures"]}
+    suspected = {s["test_id"] for s in out["suspected_issues"]}
+    if expected != suspected:
+        raise HarnessError("unknown_reference", "each expected failure needs a suspected issue with the same test_id")
+
+
 def sort_findings(out):
     """Order findings blocker first (S-BA-032), keeping the model's order within a severity.
 
@@ -521,11 +610,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--envelope", required=True, help="stdout of claude -p --output-format json")
     ap.add_argument("--schema", required=True, help="the full read-stage schema")
-    ap.add_argument("--agent", choices=["analyst", "reviewer", "architect", "developer"], default="analyst")
+    ap.add_argument("--agent", choices=["analyst", "reviewer", "architect", "developer", "test-gen-api"],
+                    default="analyst")
     ap.add_argument("--areas", help="product .staff/areas.yml (analyst)")
     ap.add_argument("--input", help="the review input file, for the expected type, target and commit (reviewer)")
     ap.add_argument("--product-dir", help="product checkout at the base: the requirements on main (analyst), the "
-                    "architecture on main (architect), the dependency files a change edits (developer)")
+                    "architecture on main (architect), the dependency files a change edits (developer), "
+                    "the sources tests cite (test-gen)")
     ap.add_argument("--strip-prefix", action="append", default=[], metavar="/DIR/=REPL",
                     help="rewrite an absolute checkout prefix in the output, e.g. /w/head/=head: (reviewer)")
     ap.add_argument("--max-run-usd", type=float, required=True)
@@ -559,6 +650,11 @@ def main():
                 raise HarnessError("input_invalid", "--input is required with --agent developer")
             result["questions_reordered"] = order_questions(out)
             check_developer(out, load_json(args.input, "input_invalid"), args.product_dir)
+        elif args.agent.startswith("test-gen"):
+            if not args.input or not args.product_dir:
+                raise HarnessError("input_invalid", "--input and --product-dir are required with --agent test-gen-*")
+            result["questions_reordered"] = order_questions(out)
+            check_test_gen(out, load_json(args.input, "input_invalid"), load_truth(args.product_dir))
         else:
             if not args.areas:
                 raise HarnessError("input_invalid", "--areas is required with --agent analyst")
@@ -580,6 +676,14 @@ def main():
         result.update(ok=True, outcome=outcome)
         summary = (f"outcome={outcome}, {len(out['proposed_files'])} files, {len(out['questions'])} questions, "
                    f"{len(out['design_requests'])} design requests, {len(out['defect_items'])} defect items")
+    elif args.agent.startswith("test-gen"):
+        # The repo is public: private reports never reach an artifact or a comment (S-SEC-011).
+        out["private_reports_withheld"] = [{"id": r["id"], "kind": r["kind"]} for r in out["private_reports"]]
+        out["private_reports"] = []
+        outcome = "proposed" if out["pr"] else "no_tests"
+        result.update(ok=True, outcome=outcome)
+        summary = (f"outcome={outcome}, {len(out['proposed_files'])} files, {len(out['suspected_issues'])} suspected "
+                   f"issues, {len(out['questions'])} questions, {len(out['defect_items'])} defect items")
     elif args.agent == "reviewer":
         result.update(ok=True, outcome=out["verdict"])
         summary = (f"verdict={out['verdict']}, {len(out['findings'])} findings, "

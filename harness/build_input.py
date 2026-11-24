@@ -1,6 +1,6 @@
 """Build an issue-triggered agent's read-stage input file from a GitHub issue event.
 
-`--agent analyst` (the default), `--agent architect` or `--agent developer`. Keeps the issue title and
+`--agent analyst` (the default), `--agent architect`, `--agent developer` or `--agent test-gen-api`. Keeps the issue title and
 body, comments by operators (governance/operators.yml, S-BA-015) and the agent
 App's own earlier comments. Drops every other comment.
 All tracker text goes under `untrusted` and is marked as data, never
@@ -31,6 +31,8 @@ AGENTS = {
                   "app_desc": "An earlier comment by the Architect write stage: your earlier drafts and questions."},
     "developer": {"kind": "developer_input", "command": "/developer", "label": "dev:implement", "app_kind": "developer_app",
                   "app_desc": "An earlier comment by the Developer write stage: your earlier drafts, test results and questions."},
+    "test-gen-api": {"kind": "test_gen_input", "command": "/qa", "label": "qa:tests", "app_kind": "qa_app",
+                     "app_desc": "An earlier comment by the test-gen write stage: your earlier drafts, sandbox results and questions."},
 }
 # Developer ticket labels, by ticket kind (S-DEV-006). A ticket with more than one is refused.
 DEV_LABELS = {"dev:implement": "implement", "dev:fix": "fix", "dev:bootstrap": "bootstrap"}
@@ -68,7 +70,7 @@ def trigger_kind(event, agent):
     comment = "comment" in event
     if agent == "architect":
         return "answer" if comment else "arch_design"
-    if agent == "developer":
+    if agent == "developer" or agent.startswith("test-gen"):
         return "answer" if comment else "label"
     return "comment" if comment else "label"
 

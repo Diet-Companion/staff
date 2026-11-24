@@ -41,7 +41,11 @@ def plugin_versions(plugins_root):
 
 def dev_outcome(validated):
     """The Developer's output has no outcome field; derive it as validate_output.py does."""
-    if not validated or validated.get("agent") != "developer":
+    if not validated:
+        return None
+    if str(validated.get("agent", "")).startswith("test-gen"):
+        return "proposed" if validated["pr"] else "no_tests"
+    if validated.get("agent") != "developer":
         return None
     return "proposed" if validated["pr"] else "code_map" if validated["code_map"] else "no_code"
 
@@ -82,6 +86,21 @@ def role_fields(validated):
             "classification": (validated["classification"] or {}).get("kind"),
             "code_map_area": (validated["code_map"] or {}).get("area"),
             "design_requests": len(validated["design_requests"]),
+            "defect_items_raised": len(validated["defect_items"]),
+            "private_reports": len(validated.get("private_reports_withheld") or []),
+            "question_ids": [q["id"] for q in validated["questions"]],
+        }
+    if str(validated.get("agent", "")).startswith("test-gen"):
+        pr = validated["pr"] or {}
+        test_files = len(validated["proposed_files"])
+        return {  # S-QA-046, stage-1 subset
+            "layer": pr.get("layer"),
+            "product_pr": pr.get("product_pr"),
+            "cited_ids": list(pr.get("cited_ids") or []),
+            "files": test_files,
+            "characterization_tests": len(pr.get("characterization") or []),
+            "expected_failures": len(pr.get("expected_failures") or []),
+            "suspected_issues": len(validated["suspected_issues"]),
             "defect_items_raised": len(validated["defect_items"]),
             "private_reports": len(validated.get("private_reports_withheld") or []),
             "question_ids": [q["id"] for q in validated["questions"]],

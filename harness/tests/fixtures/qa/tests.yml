@@ -1,0 +1,26 @@
+# QA test map (S-QA-005). Human-only file (S-GEN-025): QA checks read it from the base branch.
+# Schema: staff plugins/staff-qa/schemas/test-map.schema.json. Layers: S-QA-004.
+version: 1
+areas:
+  system:
+    api:
+      # Behaviour and contract tests through the real backend, in-process, against PostgreSQL (S-QA-004).
+      paths:
+        - tests/api/**/*.api.test.ts
+      fixtures:
+        - tests/api/support/**
+      mocks: []
+      request_docs: []
+      stack: typescript            # guard_patterns and test_list from .staff/code.yml
+      expected_value: '\bto(Be|Equal|StrictEqual|MatchObject|Contain|HaveLength)\((.+)\)'
+      matcher_strength: [toStrictEqual, toEqual, toBe, toMatchObject, toContain, toHaveLength, toBeTruthy, toBeDefined]
+      locators: { allowed: [], banned: [] }
+      mutation: none                # the mutation gate (S-QA-036) is not wired at stage 1
+      fuzz: none
+      # Harness extension: what the stage-1 work sandbox runs. DATABASE_URL comes from the job's
+      # PostgreSQL service.
+      sandbox:
+        setup: [npm ci --no-audit --no-fund]
+        build: [npm run typecheck, npm run build]
+        test: npm run test:api
+        report: reports/api.xml
