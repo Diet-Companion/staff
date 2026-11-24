@@ -222,6 +222,31 @@ class CheckDeveloperTest(unittest.TestCase):
                 out["proposed_files"][0]["path"] = path
                 self.assert_reason(out, "path_out_of_scope", broad)
 
+    def test_dependency_entry_only_for_dependency_changes(self):
+        base = tempfile.mkdtemp()
+        write(base, "package.json", json.dumps({"name": "x", "scripts": {"a": "x"}, "dependencies": {"pg": "^8"}}))
+
+        def proposal(manifest, op="modify"):
+            out = load("developer-feature.json")
+            out["proposed_files"][0] = {"path": "package.json", "op": op, "content": [json.dumps(manifest)]}
+            out["pr"]["flags"] = [{"flag_id": "dependency:package.json", "reason": "manifest edit"}]
+            return out
+
+        scripts_only = {"name": "x", "scripts": {"a": "x", "hash": "y"}, "dependencies": {"pg": "^8"}}
+        check_developer(proposal(scripts_only), feature_input(), base)  # a script edit needs no entry
+        for manifest, op, base_dir in ((dict(scripts_only, dependencies={"pg": "^9"}), "modify", base),
+                                       (dict(scripts_only, devDependencies={"x": "1"}), "modify", base),
+                                       (scripts_only, "modify", None),       # no base to compare: ask
+                                       (scripts_only, "add", base)):
+            with self.subTest(manifest=manifest, op=op, base=bool(base_dir)):
+                with self.assertRaises(HarnessError) as ctx:
+                    check_developer(proposal(manifest, op), feature_input(), base_dir)
+                self.assertEqual(ctx.exception.reason, "flag_missing")
+        out = proposal(scripts_only)
+        out["pr"]["flags"] = []
+        with self.assertRaises(HarnessError):  # the flag is still required for any manifest edit
+            check_developer(out, feature_input(), base)
+
     def test_ticket_and_acs(self):
         out = load("developer-feature.json")
         out["pr"]["ticket"] = "example/shop#22"
