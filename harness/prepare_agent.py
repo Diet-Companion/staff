@@ -118,6 +118,11 @@ DEVELOPER_CONTRACT = """\
   generator in `decision_summary` (S-DEV-043). The sandbox runs the code map's
   generators on your change before it installs anything, so a new dependency in a
   manifest is fine: list it in `pr.dependencies` and the lockfile follows.
+- **Fix-up rounds.** When your latest draft comment on the ticket shows a failing work-sandbox
+  result (a build error, or tests that newly fail or that you added and fail), this run is a fix-up
+  round: the workflow started it automatically, at most 3 times per draft. Fix exactly that failure
+  and keep the rest of the draft as it was, unless the fix needs more. Say in `decision_summary`
+  what failed and what you changed.
 - **No secret-like strings.** The output is redaction-checked and dropped whole on a hit
   (S-SEC-004): no realistic-looking keys or tokens, no base64 fixtures, no other long
   mixed-case strings with digits. Build test bytes in code (`new Uint8Array(16)`,
