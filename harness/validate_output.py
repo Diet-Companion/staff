@@ -80,7 +80,7 @@ def dupes(values):
     return sorted(v for v, n in Counter(values).items() if n > 1)
 
 
-def check_harness(out, areas, stage):
+def check_harness(out, areas, stage, truth=None):
     """Checks JSON Schema can't express. Raises on the first failing check."""
     reqs, questions = out["requirements"], out["questions"]
 
@@ -138,6 +138,10 @@ def check_harness(out, areas, stage):
         if q["recommended"] not in {o["id"] for o in q["options"]}:
             raise HarnessError("recommended_not_option", f"/questions/{i}/recommended")
 
+    # A requirement already on main keeps its revision history.
+    for i, r in enumerate(reqs):
+        check_revision_append_only(r, (truth or {}).get(r.get("id"), {}), f"/requirements/{i}")
+
     # Stage 1 is advisory: drafts only, no ready gate (S-BA-009, S-BA-042, S-GEN-052).
     if stage == 1:
         if out.get("ready_gate"):
@@ -169,8 +173,17 @@ def _applied(out, target, field):
 
 def architecture_truth(product_dir):
     """ID -> front matter of each architecture file on the product's default branch (S-ARCH-004)."""
+    return front_matter_truth(product_dir, os.path.join("architecture", "**", "*.md"))
+
+
+def requirements_truth(product_dir):
+    """ID -> front matter of each requirement on the product's default branch."""
+    return front_matter_truth(product_dir, os.path.join("requirements", "**", "REQ-*.md"))
+
+
+def front_matter_truth(product_dir, pattern):
     truth = {}
-    for path in sorted(glob.glob(os.path.join(product_dir, "architecture", "**", "*.md"), recursive=True)):
+    for path in sorted(glob.glob(os.path.join(product_dir, pattern), recursive=True)):
         with open(path, encoding="utf-8") as fh:
             text = fh.read()
         if not text.startswith("---"):
@@ -182,6 +195,22 @@ def architecture_truth(product_dir):
         if isinstance(fm, dict) and isinstance(fm.get("id"), str):
             truth[fm["id"]] = fm
     return truth
+
+
+def _canonical(entries):
+    return json.dumps(entries, sort_keys=True, default=str)
+
+
+def check_revision_append_only(new, cur, where):
+    """An element already on main keeps its revision history: the entries on main come back unchanged and
+    in order, and new entries are only appended. The history is the record of who decided what, and when."""
+    old = cur.get("revision") if isinstance(cur, dict) else None
+    if not isinstance(old, list) or not old:
+        return
+    entries = new.get("revision")
+    if not isinstance(entries, list) or len(entries) < len(old) or \
+            _canonical(entries[:len(old)]) != _canonical(old):
+        raise HarnessError("revision_rewritten", f"{where}/revision changes or drops entries that are on main")
 
 
 def check_architect(out, expect, stage=1, truth=None):
@@ -224,6 +253,7 @@ def check_architect(out, expect, stage=1, truth=None):
             raise HarnessError("owner_field_set", f"/answers_applied/{i} does not cite an operator comment of this ticket")
     for i, a in enumerate(arts):
         cur = truth.get(a["id"], {})
+        check_revision_append_only(a, cur, f"/artifacts/{i}")
         decision = a.get("decision") if a["type"] == "adr" else None
         if stage == 1 and cur and "status" in a:
             # Already on main: the agent never moves its status (S-ARCH-011).
@@ -494,8 +524,8 @@ def main():
     ap.add_argument("--agent", choices=["analyst", "reviewer", "architect", "developer"], default="analyst")
     ap.add_argument("--areas", help="product .staff/areas.yml (analyst)")
     ap.add_argument("--input", help="the review input file, for the expected type, target and commit (reviewer)")
-    ap.add_argument("--product-dir", help="product checkout at the base: the architecture on main (architect), "
-                    "the dependency files a change edits (developer)")
+    ap.add_argument("--product-dir", help="product checkout at the base: the requirements on main (analyst), the "
+                    "architecture on main (architect), the dependency files a change edits (developer)")
     ap.add_argument("--strip-prefix", action="append", default=[], metavar="/DIR/=REPL",
                     help="rewrite an absolute checkout prefix in the output, e.g. /w/head/=head: (reviewer)")
     ap.add_argument("--max-run-usd", type=float, required=True)
@@ -532,7 +562,8 @@ def main():
         else:
             if not args.areas:
                 raise HarnessError("input_invalid", "--areas is required with --agent analyst")
-            check_harness(out, load_areas(args.areas), args.stage)
+            truth = requirements_truth(args.product_dir) if args.product_dir else {}
+            check_harness(out, load_areas(args.areas), args.stage, truth)
     except HarnessError as err:
         result.update(reason=err.reason, detail=err.detail)
         write_json(args.result, result)

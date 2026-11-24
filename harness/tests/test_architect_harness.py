@@ -222,6 +222,32 @@ class CheckArchitectTest(unittest.TestCase):
         fails("owner_field_set", lambda a: a["ADR-004"]["decision"].update(chosen="a"))
         fails("owner_field_set", lambda a: a["IF-003"].update(compatibility_policy="public"))
 
+    def test_revision_history_is_append_only(self):
+        doc = load("architect-design.json")
+        art = next(a for a in doc["artifacts"] if a["type"] == "component")
+        on_main = [{"date": "2026-11-20", "change": "Initial draft", "reason": "Design need",
+                    "source_ref": f"{REPO}#33"},
+                   {"date": "2026-11-21", "change": "Owner signed off the data owner", "reason": "Answer",
+                    "source_ref": f"{REPO}#33 comment 5"}]
+        truth = {art["id"]: {"id": art["id"], "status": art["status"], "revision": on_main}}
+        new = {"date": "2026-11-24", "change": "Responsibilities extended", "reason": "Design need",
+               "source_ref": f"{REPO}#78"}
+
+        def run(revision):
+            d = copy.deepcopy(doc)
+            next(a for a in d["artifacts"] if a["id"] == art["id"])["revision"] = revision
+            check_architect(d, expect_for(d), truth=truth)
+
+        run(copy.deepcopy(on_main) + [new])  # appended: fine
+        run(copy.deepcopy(on_main))  # unchanged: fine
+        reworded = copy.deepcopy(on_main)
+        reworded[1]["change"] = "Owner signed off"
+        for revision in (reworded + [new], on_main[:1] + [new], [new] + copy.deepcopy(on_main),
+                         list(reversed(copy.deepcopy(on_main))), []):
+            with self.subTest(revision=revision), self.assertRaises(HarnessError) as ctx:
+                run(revision)
+            self.assertEqual(ctx.exception.reason, "revision_rewritten")
+
     def test_architecture_truth_reads_front_matter(self):
         d = tempfile.mkdtemp()
         os.makedirs(os.path.join(d, "architecture", "system", "adr"))
