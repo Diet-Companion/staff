@@ -230,6 +230,20 @@ class RenderTest(unittest.TestCase):
         self.assertNotIn("@giokur", main)
         self.assertNotIn("[x](", main)
 
+    def test_spec_path_follows_the_interface_file(self):
+        def spec_path(declared):
+            doc = load("architect-design.json")
+            next(a for a in doc["artifacts"] if a["type"] == "interface")["versions"][0]["spec"] = declared
+            body = next(b for n, b in render(doc, Args, {})[0] if "IF-003" in n)
+            return re.search(r"Proposed spec <code>([^<]+)</code>", body).group(1)
+        own = "architecture/orders/interfaces/IF-003/openapi.json"
+        self.assertEqual(spec_path(own), own)
+        fallback = "architecture/orders/interfaces/IF-003/1.0.0.yaml"
+        for bad in ("architecture/orders/interfaces/IF-003/../../../../.github/x.yml",
+                    "architecture/billing/interfaces/IF-009/1.0.0.yaml", ".github/workflows/x.yml"):
+            with self.subTest(bad):
+                self.assertEqual(spec_path(bad), fallback)
+
     def test_req_tickets(self):
         d = tempfile.mkdtemp()
         os.makedirs(os.path.join(d, "requirements", "catalog"))
