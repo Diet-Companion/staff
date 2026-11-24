@@ -504,3 +504,22 @@ class RunRecordTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CaseClashTest(unittest.TestCase):
+    def test_names_differing_only_in_case_are_refused(self):
+        from validate_output import check_case_clash
+        ok = [{"path": "client/src/dishFormLogic.ts", "op": "add"}, {"path": "client/src/DishFormView.tsx", "op": "add"},
+              {"path": "client/src/dishForm.test.ts", "op": "add"}]
+        check_case_clash(ok)
+        clash = [{"path": "client/src/dishForm.ts", "op": "add"}, {"path": "client/src/DishForm.tsx", "op": "add"}]
+        with self.assertRaises(HarnessError) as ctx:
+            check_case_clash(clash)
+        self.assertEqual(ctx.exception.reason, "case_clash")
+        d = tempfile.mkdtemp()
+        os.makedirs(os.path.join(d, "client", "src"))
+        open(os.path.join(d, "client", "src", "flow.ts"), "w").close()
+        check_case_clash([{"path": "client/src/flow.ts", "op": "modify"}], d)  # the same file is no clash
+        with self.assertRaises(HarnessError):
+            check_case_clash([{"path": "client/src/Flow.tsx", "op": "add"}], d)  # clashes with flow.ts on main
+
