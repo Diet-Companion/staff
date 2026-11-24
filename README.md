@@ -41,14 +41,18 @@ staff/
       skills/review-<type>/SKILL.md    # one checklist per type; only requirements is wired
       schemas/review-output.schema.json
   harness/                             # read/write-stage harness for headless runs (Python 3.12)
-    build_input.py                     # issue + operator comments -> untrusted input file (analyst, architect)
+    build_input.py                     # issue + operator comments -> untrusted input file (analyst, architect, developer)
+    dev_bundle.py                      # Developer fetch step: readiness (S-DEV-007) and the area's code-map entry
     build_review_input.py              # PR + changed files + comments -> reviewer input file
     prepare_agent.py                   # agent + preloaded skills -> system prompt; CLI schema
-    validate_output.py                 # envelope, cost, schema and harness checks (analyst, reviewer)
+    validate_output.py                 # envelope, cost, schema and harness checks (analyst, reviewer, architect, developer)
     redact_check.py                    # fail-closed secret and email scan (S-SEC-004)
     render_comment.py                  # deterministic Markdown comments (Analyst)
     render_review.py                   # one review comment, labels, machine-readable block
     render_architect.py                # Architect: main comment, one comment per draft, defect items
+    render_developer.py                # Developer: one comment per draft change, with the sandbox result
+    work_sandbox.py                    # Developer work sandbox: apply the proposed files, then build and test (S-DEV-042)
+    code_map.py                        # .staff/code.yml loader and path scope (S-DEV-004, -005)
     ready_gate.py                      # ready-gate (S-BA-017) and lifecycle (S-BA-009) check, no model
     run_record.py                      # run record (S-GEN-029)
     contract.py                        # operators.yml, areas.yml, product.yml readers

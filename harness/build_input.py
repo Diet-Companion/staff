@@ -1,6 +1,6 @@
 """Build an issue-triggered agent's read-stage input file from a GitHub issue event.
 
-`--agent analyst` (the default) or `--agent architect`. Keeps the issue title and
+`--agent analyst` (the default), `--agent architect` or `--agent developer`. Keeps the issue title and
 body, comments by operators (governance/operators.yml, S-BA-015) and the agent
 App's own earlier comments. Drops every other comment.
 All tracker text goes under `untrusted` and is marked as data, never
@@ -29,7 +29,11 @@ AGENTS = {
                 "app_desc": "An earlier comment by the Analyst write stage: your earlier question batches and drafts."},
     "architect": {"kind": "architect_input", "command": "/architect", "label": "arch:design", "app_kind": "architect_app",
                   "app_desc": "An earlier comment by the Architect write stage: your earlier drafts and questions."},
+    "developer": {"kind": "developer_input", "command": "/developer", "label": "dev:implement", "app_kind": "developer_app",
+                  "app_desc": "An earlier comment by the Developer write stage: your earlier drafts, test results and questions."},
 }
+# Developer ticket labels, by ticket kind (S-DEV-006). A ticket with more than one is refused.
+DEV_LABELS = {"dev:implement": "implement", "dev:fix": "fix", "dev:bootstrap": "bootstrap"}
 COMMENT_KINDS = {"operator": OPERATOR_KIND, "analyst_app": AGENTS["analyst"]["app_desc"]}
 COMMAND = AGENTS["analyst"]["command"]
 DEFAULT_MAX_BYTES = 100_000
@@ -59,11 +63,23 @@ def classify(comment, operators, bot_login, agent="analyst"):
 
 
 def trigger_kind(event, agent):
-    """Analyst: label or comment. Architect: arch_design (the label) or answer (S-ARCH-034)."""
+    """Analyst: label or comment. Architect: arch_design (the label) or answer (S-ARCH-034).
+    Developer: label or answer."""
     comment = "comment" in event
     if agent == "architect":
         return "answer" if comment else "arch_design"
+    if agent == "developer":
+        return "answer" if comment else "label"
     return "comment" if comment else "label"
+
+
+def dev_ticket_kind(issue):
+    """implement, fix or bootstrap, from the ticket's one dev:* label."""
+    names = {str((lb or {}).get("name", "")) for lb in issue.get("labels") or []}
+    kinds = {DEV_LABELS[n] for n in names if n in DEV_LABELS}
+    if len(kinds) != 1:
+        raise HarnessError("input_invalid", "a Developer ticket needs exactly one of dev:implement, dev:fix, dev:bootstrap")
+    return kinds.pop()
 
 
 def build(event, comments, operators, areas, bot_login, run_id, product_core, product_core_exists, agent="analyst"):
@@ -90,15 +106,14 @@ def build(event, comments, operators, areas, bot_login, run_id, product_core, pr
             "body": c.get("body") or "",
         })
     author = (issue.get("user") or {}).get("login", "")
+    run = {"run_id": run_id, "trigger": trigger_kind(event, agent), "intake_ref": ref}
+    if agent == "developer":
+        run["ticket_kind"] = dev_ticket_kind(issue)
     return {
         "kind": spec["kind"],
         "version": 1,
         "notice": UNTRUSTED_NOTICE,
-        "run": {
-            "run_id": run_id,
-            "trigger": trigger_kind(event, agent),
-            "intake_ref": ref,
-        },
+        "run": run,
         "product": {
             "areas": areas,
             "areas_path": ".staff/areas.yml",
