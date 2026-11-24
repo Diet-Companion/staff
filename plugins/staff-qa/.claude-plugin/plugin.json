@@ -1,0 +1,6 @@
+{
+  "name": "staff-qa",
+  "version": "0.1.0",
+  "description": "Test engineer agents (S-GEN-014, S-QA-002). Stage 1: test-gen-api only, read stage; the healer, exploratory, mutation helpers and the UI layer come later.",
+  "dependencies": ["staff-core"]
+}

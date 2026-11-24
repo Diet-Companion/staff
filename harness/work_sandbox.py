@@ -12,7 +12,11 @@ workflow steps so the patch is saved before any proposed code runs:
          its build passes, no test that passes on the base fails on it (a failure is
          re-run once; passing then makes it flaky), and every test it adds passes.
 
-Every command comes from `.staff/code.yml` on the base branch, never from the model.
+QA mode (S-QA-017): when the meta file is a test-gen `qa` section, the commands come from the layer's
+`sandbox` block in `.staff/tests.yml` instead, and `test --validated` names the draft's expected failures:
+an added test listed there may fail without failing the draft; it is reported as expected.
+
+Every command comes from `.staff/code.yml` or `.staff/tests.yml` on the base branch, never from the model.
 The `test` step runs proposed code on the same runner, so its result is advisory:
 the write stage validates it strictly and posts only counts and test IDs.
 """
@@ -32,13 +36,50 @@ MAX_REPORT_BYTES = 5_000_000
 TEST_ID_MAX = 300
 TAIL_LINES, TAIL_WIDTH, MESSAGE_MAX, MESSAGES_MAX = 40, 200, 300, 10
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
-CLEAN_ENV_KEYS = ("PATH", "HOME", "LANG", "TMPDIR", "RUNNER_TEMP")
+# DATABASE_URL points at the job's throwaway PostgreSQL service container (the QA api layer), never at a
+# real database: the sandbox job holds no secrets.
+CLEAN_ENV_KEYS = ("PATH", "HOME", "LANG", "TMPDIR", "RUNNER_TEMP", "DATABASE_URL")
+
+
+UNTESTED_REASONS = ("no sandbox commands in .staff/code.yml", "no sandbox commands in .staff/tests.yml")
+
+
+def meta_of(path):
+    """The harness-made section: dev-meta.json, qa-meta.json, or a bundled input file."""
+    data = load_json(path, "input_invalid")
+    return data.get("developer") or data.get("qa") or data
 
 
 def code_map_entry(path):
-    """The area's code-map entry, from dev-meta.json or a bundled input file."""
-    data = load_json(path, "input_invalid")
-    return (data.get("developer") or data).get("code_map_entry") or {}
+    """The area's code-map entry, from the meta file."""
+    return meta_of(path).get("code_map_entry") or {}
+
+
+def sandbox_of(meta):
+    """(normalised sandbox {setup, build, test, report} or None, the reason when None)."""
+    if "test_map_entry" in meta:
+        sb = (meta.get("test_map_entry") or {}).get("sandbox")
+        return (dict(sb) if sb else None), UNTESTED_REASONS[1]
+    sb = (meta.get("code_map_entry") or {}).get("sandbox")
+    if not sb:
+        return None, UNTESTED_REASONS[0]
+    return {"setup": sb["setup"], "build": sb["build"], "test": sb["unit_test"], "report": sb["unit_report"]}, None
+
+
+def expected_ids(validated_path):
+    """The test IDs the draft expects to fail (test-gen pr.expected_failures), or an empty set."""
+    if not validated_path:
+        return set()
+    pr = (load_json(validated_path, "artifact_missing") or {}).get("pr") or {}
+    return {e["test_id"] for e in pr.get("expected_failures") or [] if isinstance(e, dict) and isinstance(e.get("test_id"), str)}
+
+
+def is_expected(tid, expected):
+    """A report test ID matches a declared one exactly, or by file and full title suffix."""
+    if tid in expected:
+        return True
+    path, _, name = tid.partition("::")
+    return any(e.partition("::")[0] == path and name.endswith(e.partition("::")[2]) for e in expected)
 
 
 def safe_target(repo, path):
@@ -184,8 +225,8 @@ def junit_results(path):
 
 
 def run_side(repo, sandbox, log):
-    """(build_ok, results or None, failure or None) for one checkout."""
-    report = os.path.join(repo, sandbox["unit_report"])
+    """(build_ok, results or None, failure or None) for one checkout. sandbox is normalised (sandbox_of)."""
+    report = os.path.join(repo, sandbox["report"])
     if os.path.exists(report):
         os.remove(report)
     for step, cmds in (("setup", sandbox["setup"]), ("build", sandbox["build"])):
@@ -194,21 +235,21 @@ def run_side(repo, sandbox, log):
             if not sh(cmd, repo, log):
                 return False, None, {"step": step, "command": cmd, "tail": output_tail(log, start, repo)}
     start = os.path.getsize(log) if os.path.exists(log) else 0
-    sh(sandbox["unit_test"], repo, log)
+    sh(sandbox["test"], repo, log)
     results = junit_results(report)
     if results is None:
-        return True, None, {"step": "report", "command": sandbox["unit_test"], "tail": output_tail(log, start, repo)}
+        return True, None, {"step": "report", "command": sandbox["test"], "tail": output_tail(log, start, repo)}
     return True, results, None
 
 
 def cmd_test(args):
-    entry = code_map_entry(args.input)
+    sandbox, reason = sandbox_of(meta_of(args.input))
     os.makedirs(args.out_dir, exist_ok=True)
-    sandbox = entry.get("sandbox")
     if not sandbox:
-        write_json(args.out, {"version": 1, "status": "untested", "reason": "no sandbox commands in .staff/code.yml"})
-        print("untested: the code map has no sandbox commands")
+        write_json(args.out, {"version": 1, "status": "untested", "reason": reason})
+        print(f"untested: {reason}")
         return
+    expected = expected_ids(getattr(args, "validated", None))
     base_build, base, _ = run_side(args.base, sandbox, os.path.join(args.out_dir, "base.log"))
     head_log = os.path.join(args.out_dir, "head.log")
     head_build, head, failure = run_side(args.head, sandbox, head_log)
@@ -216,19 +257,22 @@ def cmd_test(args):
     regressions = sorted(t for t, ok in head_res.items() if not ok and base.get(t) is True)
     flaky = []
     if regressions and head_build:
-        sh(sandbox["unit_test"], args.head, head_log)
-        rerun = junit_results(os.path.join(args.head, sandbox["unit_report"])) or {}
+        sh(sandbox["test"], args.head, head_log)
+        rerun = junit_results(os.path.join(args.head, sandbox["report"])) or {}
         flaky = sorted(t for t in regressions if rerun.get(t) is True)
         regressions = sorted(set(regressions) - set(flaky))
     added = sorted(t for t in head_res if t not in base)
-    added_failing = sorted(t for t in added if not head_res[t])
+    failing = sorted(t for t in added if not head_res[t])
+    expected_failing = [t for t in failing if is_expected(t, expected)]
+    added_failing = [t for t in failing if t not in expected_failing]
     if not head_build:
         status = "fail"
     elif head is None:
         status = "fail"  # the build passed but no test report was written
     else:
         status = "fail" if regressions or added_failing else "pass"
-    messages = junit_messages(os.path.join(args.head, sandbox["unit_report"]), set(regressions + added_failing))
+    messages = junit_messages(os.path.join(args.head, sandbox["report"]),
+                              set(regressions + added_failing + expected_failing))
     write_json(args.out, {
         "version": 1, "status": status,
         "build": {"base": base_build, "head": head_build},
@@ -237,7 +281,8 @@ def cmd_test(args):
         "messages": messages,
         "tests": {"base_total": len(base), "head_total": len(head_res), "added": len(added),
                   "regressions": regressions[:50], "flaky": flaky[:50], "added_failing": added_failing[:50],
-                  "base_failing": sorted(t for t, ok in base.items() if not ok)[:50]},
+                  "base_failing": sorted(t for t, ok in base.items() if not ok)[:50],
+                  "expected_failing": expected_failing[:50]},
     })
     print(f"sandbox: {status}; build base={base_build} head={head_build}; tests {len(head_res)} "
           f"({len(added)} added, {len(added_failing)} added failing, {len(regressions)} regressions, {len(flaky)} flaky)")
@@ -273,21 +318,24 @@ def check_result(data, sandbox=None):
     if not isinstance(data, dict) or data.get("version") != 1:
         return False
     if data.get("status") == "untested":
-        return set(data) == {"version", "status", "reason"} and data["reason"] == "no sandbox commands in .staff/code.yml"
+        return set(data) == {"version", "status", "reason"} and data["reason"] in UNTESTED_REASONS
     t, b = data.get("tests"), data.get("build")
     return (data.get("status") in ("pass", "fail") and isinstance(b, dict) and isinstance(t, dict)
             and all(isinstance(b.get(k), bool) for k in ("base", "head"))
             and isinstance((data.get("report") or {}).get("head"), bool)
             and all(isinstance(t.get(k), int) and 0 <= t[k] < 10**6 for k in ("base_total", "head_total", "added"))
             and all(ids(t.get(k)) for k in ("regressions", "flaky", "added_failing", "base_failing"))
+            and ids(t.get("expected_failing", []))
             and check_failure(data.get("failure"), commands(sandbox))
-            and check_messages(data.get("messages", {}), set(t["regressions"]) | set(t["added_failing"])))
+            and check_messages(data.get("messages", {}), set(t["regressions"]) | set(t["added_failing"])
+                               | set(t.get("expected_failing", []))))
 
 
 def commands(sandbox):
+    """The commands a failure may name: a code-map sandbox block or a normalised one."""
     if not sandbox:
         return set()
-    return set(sandbox["setup"]) | set(sandbox["build"]) | {sandbox["unit_test"]}
+    return set(sandbox["setup"]) | set(sandbox["build"]) | {sandbox.get("test") or sandbox.get("unit_test")}
 
 
 def main():
@@ -295,11 +343,13 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("apply")
     a.add_argument("--validated", required=True)
-    a.add_argument("--input", required=True, help="dev-meta.json (or the bundled input), for the code-map entry")
+    a.add_argument("--input", required=True, help="dev-meta.json or qa-meta.json (or the bundled input), "
+                   "for the code-map entry")
     a.add_argument("--repo", required=True, help="checkout of the base to change")
     a.add_argument("--out-dir", required=True)
     t = sub.add_parser("test")
-    t.add_argument("--input", required=True, help="dev-meta.json (or the bundled input)")
+    t.add_argument("--input", required=True, help="dev-meta.json or qa-meta.json (or the bundled input)")
+    t.add_argument("--validated", help="the validated output, for test-gen expected failures")
     t.add_argument("--base", required=True, help="checkout of the base")
     t.add_argument("--head", required=True, help="the base with the change applied")
     t.add_argument("--out-dir", required=True, help="logs")

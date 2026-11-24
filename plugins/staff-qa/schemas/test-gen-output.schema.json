@@ -1,0 +1,615 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://staff.local/schemas/staff-qa/test-gen-output.schema.json",
+  "title": "test-gen read-stage output (S-QA-026, stage 1)",
+  "description": "The JSON a test-gen-* agent returns. The harness validates it, applies proposed_files in the work sandbox, runs the layer's tests and renders comments (S-QA-017, S-QA-018).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "decision_summary",
+    "pr",
+    "proposed_files",
+    "suspected_issues",
+    "defect_items",
+    "questions",
+    "assumptions",
+    "private_reports",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "test-gen-api"
+    },
+    "decision_summary": {
+      "description": "What the human must decide first (suspected issues, questions, defect items), then what the tests cover and what could not be verified.",
+      "$ref": "#/$defs/text"
+    },
+    "pr": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/pr"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "proposed_files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/proposed_file"
+      },
+      "maxItems": 15,
+      "description": "Test files and fixtures, full content. Non-empty exactly when pr is set."
+    },
+    "suspected_issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/suspected_issue"
+      },
+      "maxItems": 10
+    },
+    "defect_items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/defect_item"
+      },
+      "maxItems": 7
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/question"
+      },
+      "maxItems": 7,
+      "description": "At most 7, blocking first (S-BA-014)."
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/run_assumption"
+      }
+    },
+    "private_reports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/private_report"
+      },
+      "maxItems": 7
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "pr": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "pr"
+        ]
+      },
+      "then": {
+        "properties": {
+          "proposed_files": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "proposed_files": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "ref": {
+      "description": "A source ref: ticket, comment, CI or check result, REQ/AC/TC ID, R-ID, IF version or element, ADR-n/C-k, test ID, or repo path (with line).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "path": {
+      "description": "A repo-relative, normalised file path: no leading slash, no . or .. segment, no backslash or control character, not under .git/.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!\\.git/)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\x00-\\x1f\\\\]+$"
+    },
+    "chunk": {
+      "description": "One ordered chunk of a file's full content, at most 2,000 characters (S-DEV-021). No NUL: binary content is never passed.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "pattern": "^[^\\x00]*$"
+    },
+    "req_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^REQ-[0-9]{3,}$"
+    },
+    "ac_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^REQ-[0-9]{3,}/AC-[0-9]{3,}$"
+    },
+    "any_req_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^REQ-[0-9]{3,}(/AC-[0-9]{3,})?$"
+    },
+    "rule_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^R-[0-9]{3,}$"
+    },
+    "if_version": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "if_element": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+#[^\\s#]{1,200}$"
+    },
+    "adr_constraint": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^ADR-[0-9]{3,}/C-[0-9]{3,}$"
+    },
+    "test_id": {
+      "description": "Test ID v1, <path>::<name> as the area's test_list command prints it (S-DEV-045).",
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 500,
+      "pattern": "^[^\\s:][^\\x00-\\x1f]*::[^\\x00-\\x1f]+$"
+    },
+    "proposed_file": {
+      "description": "One file of the proposed change (read-only form of S-DEV-021 files[]). content is the file's full new content as ordered chunks, never a diff or a reference. The harness applies it in the work sandbox and derives files[] from the workspace diff (S-DEV-042).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "op",
+        "content"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "op": {
+          "enum": [
+            "add",
+            "modify",
+            "delete",
+            "rename"
+          ]
+        },
+        "from": {
+          "description": "rename only: the old path.",
+          "$ref": "#/$defs/path"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/chunk"
+          },
+          "maxItems": 50,
+          "description": "Ordered chunks; concatenated, they are the file byte for byte. Empty for delete (and for an empty file)."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "rename"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "from"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "from"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "delete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "content": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "question_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^Q-[0-9]{3,}$"
+    },
+    "assumption_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^A-[0-9]{3,}$"
+    },
+    "key": {
+      "description": "What a question or assumption is about (S-BA-007 key form).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity",
+        "target_id",
+        "attribute"
+      ],
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/short_text"
+        },
+        "target_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "attribute": {
+          "$ref": "#/$defs/short_text"
+        }
+      }
+    },
+    "question": {
+      "description": "An implementation trade-off no rule, AC or ADR decides, in the S-BA-014 form (S-DEV-008).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "key",
+        "blocks",
+        "blocking",
+        "text",
+        "options",
+        "recommended",
+        "priority"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/question_id"
+        },
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          },
+          "minItems": 1,
+          "description": "The AC IDs, IF elements, ADR constraints or ticket it blocks."
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 1,
+                "pattern": "^[a-d]$"
+              },
+              "text": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          },
+          "minItems": 2,
+          "maxItems": 4
+        },
+        "recommended": {
+          "description": "Shown to the human; never applied without an operator answer.",
+          "type": "string",
+          "maxLength": 1,
+          "pattern": "^[a-d]$"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      }
+    },
+    "run_assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "key",
+        "text",
+        "blocking"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/assumption_id"
+        },
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        },
+        "blocking": {
+          "type": "boolean"
+        }
+      }
+    },
+    "defect_item": {
+      "description": "A requirement-defect item in the S-BA-048 form, posted on the requirement's ticket (S-DEV-008). text explains it for the human.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "kind",
+        "evidence_refs",
+        "text"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/any_req_id"
+        },
+        "kind": {
+          "enum": [
+            "ambiguous",
+            "contradicts",
+            "untestable",
+            "missing",
+            "infeasible"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          },
+          "minItems": 1
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "private_report": {
+      "description": "A suspected vulnerability or exposed secret (S-DEV-019, S-SEC-011). Filed privately; never quotes a secret's value.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "location",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 300,
+          "pattern": "^SR-[0-9]{3,}$"
+        },
+        "kind": {
+          "enum": [
+            "vulnerability",
+            "exposed_secret"
+          ]
+        },
+        "location": {
+          "description": "Where it is (path and line, or comment ref), never the value.",
+          "$ref": "#/$defs/ref"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "qas_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^QAS-[0-9]{3,}$"
+    },
+    "cite_id": {
+      "description": "A test citation (S-QA-007): a ready AC, an active rule, an approved interface version or element, an accepted ADR constraint, or an accepted QAS.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ac_id"
+        },
+        {
+          "$ref": "#/$defs/rule_id"
+        },
+        {
+          "$ref": "#/$defs/if_version"
+        },
+        {
+          "$ref": "#/$defs/if_element"
+        },
+        {
+          "$ref": "#/$defs/adr_constraint"
+        },
+        {
+          "$ref": "#/$defs/qas_id"
+        }
+      ]
+    },
+    "expected_failure": {
+      "description": "A test that fails on main because the code differs from its cited source (S-QA-009). It stays in the draft as an expected failure and is reported as a suspected issue.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "test_id",
+        "cites",
+        "expected",
+        "actual",
+        "evidence_refs"
+      ],
+      "properties": {
+        "test_id": {
+          "$ref": "#/$defs/test_id"
+        },
+        "cites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cite_id"
+          },
+          "minItems": 1
+        },
+        "expected": {
+          "$ref": "#/$defs/short_text"
+        },
+        "actual": {
+          "$ref": "#/$defs/short_text"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "suspected_issue": {
+      "description": "A suspected product bug: a cited expectation the code doesn't meet (S-QA-009, S-QA-011). The human gives the verdict.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "test_id",
+        "cites",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 300,
+          "pattern": "^SI-[0-9]{3,}$"
+        },
+        "test_id": {
+          "$ref": "#/$defs/test_id"
+        },
+        "cites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cite_id"
+          },
+          "minItems": 1
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "pr": {
+      "description": "The test PR block (S-QA-026), stage 1: a draft against main.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "layer",
+        "product_pr",
+        "base",
+        "cited_ids",
+        "characterization",
+        "expected_failures"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "tests",
+            "repair"
+          ]
+        },
+        "layer": {
+          "enum": [
+            "api"
+          ]
+        },
+        "product_pr": {
+          "description": "Stage 1: null, the draft targets main.",
+          "type": "null"
+        },
+        "base": {
+          "const": "main"
+        },
+        "cited_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cite_id"
+          },
+          "minItems": 1
+        },
+        "characterization": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/test_id"
+          },
+          "description": "Tests labelled characterization (S-QA-006)."
+        },
+        "expected_failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/expected_failure"
+          },
+          "maxItems": 10
+        }
+      }
+    }
+  }
+}
