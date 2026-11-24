@@ -318,7 +318,29 @@ def check_questions(questions):
             raise HarnessError("recommended_not_option", f"/questions/{i}/recommended")
 
 
-def check_developer(out, expect):
+DEPENDENCY_KEYS = ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies")
+
+
+def dependency_sets_change(f, base_dir):
+    """True when a proposed dependency file changes what it depends on.
+
+    A JSON manifest (package.json) is compared section by section with the base file, so a
+    script or metadata edit isn't a dependency change (live run 45373601246). Anything that
+    can't be compared counts as a change, failing towards asking for a dependencies entry."""
+    if f["op"] != "modify" or not base_dir or not f["path"].endswith(".json"):
+        return True
+    try:
+        with open(os.path.join(base_dir, f["path"]), encoding="utf-8") as fh:
+            before = json.load(fh)
+        after = json.loads("".join(f["content"]))
+    except (OSError, ValueError):
+        return True
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return True
+    return any(before.get(k) != after.get(k) for k in DEPENDENCY_KEYS)
+
+
+def check_developer(out, expect, base_dir=None):
     """Developer checks JSON Schema can't express (S-DEV-005, -007, -009, -021). Raises on the first failure.
 
     expect is the bundled input: `run` and the harness-made `developer` section. Changed
@@ -365,7 +387,7 @@ def check_developer(out, expect):
             if forbidden(p) or "generated" in cls or not cls & {"source", "unit_tests", *FLAGGED}:
                 raise HarnessError("path_out_of_scope", f"/proposed_files/{i} is outside the area's code-map scope")
             flagged |= cls & set(FLAGGED)
-            deps |= "dependency_files" in cls
+            deps |= "dependency_files" in cls and (p != f["path"] or dependency_sets_change(f, base_dir))
     if flagged and not pr["flags"]:
         raise HarnessError("flag_missing", f"{', '.join(sorted(flagged))} paths change without a /pr/flags entry")
     if deps and not pr["dependencies"]:
@@ -472,7 +494,8 @@ def main():
     ap.add_argument("--agent", choices=["analyst", "reviewer", "architect", "developer"], default="analyst")
     ap.add_argument("--areas", help="product .staff/areas.yml (analyst)")
     ap.add_argument("--input", help="the review input file, for the expected type, target and commit (reviewer)")
-    ap.add_argument("--product-dir", help="product checkout, for the architecture already on main (architect)")
+    ap.add_argument("--product-dir", help="product checkout at the base: the architecture on main (architect), "
+                    "the dependency files a change edits (developer)")
     ap.add_argument("--strip-prefix", action="append", default=[], metavar="/DIR/=REPL",
                     help="rewrite an absolute checkout prefix in the output, e.g. /w/head/=head: (reviewer)")
     ap.add_argument("--max-run-usd", type=float, required=True)
@@ -505,7 +528,7 @@ def main():
             if not args.input:
                 raise HarnessError("input_invalid", "--input is required with --agent developer")
             result["questions_reordered"] = order_questions(out)
-            check_developer(out, load_json(args.input, "input_invalid"))
+            check_developer(out, load_json(args.input, "input_invalid"), args.product_dir)
         else:
             if not args.areas:
                 raise HarnessError("input_invalid", "--areas is required with --agent analyst")
