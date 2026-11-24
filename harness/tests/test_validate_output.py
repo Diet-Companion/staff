@@ -107,6 +107,21 @@ class ValidateTest(unittest.TestCase):
         check_schema(out, self.schema)  # each case is schema-valid on purpose
         return self.assertReason(reason, check_harness, out, AREAS, 1)
 
+    def test_requirement_revision_history_is_append_only(self):
+        out = copy.deepcopy(load("output-drafts.json"))
+        req = out["requirements"][0]
+        on_main = [{"date": "2026-11-22", "change": "A-002 confirmed", "reason": "Operator answer",
+                    "source_ref": "Diet-Companion/diet-companion#6 comment 1"}]
+        truth = {req["id"]: {"id": req["id"], "revision": on_main}}
+        req["revision"] = copy.deepcopy(on_main) + list(req.get("revision") or [])
+        check_schema(out, self.schema)
+        check_harness(out, AREAS, 1, truth)
+        req["revision"][0]["change"] = "A-002 assumed"
+        self.assertReason("revision_rewritten", check_harness, out, AREAS, 1, truth)
+        req["revision"] = list(req["revision"][1:])
+        self.assertReason("revision_rewritten", check_harness, out, AREAS, 1, truth)
+        check_harness(out, AREAS, 1)  # a requirement that isn't on main has no history to keep
+
     def test_story_parent_must_be_the_runs_epic(self):
         self.harness_case("parent_mismatch", lambda o: o["requirements"][2].update(parent="REQ-099"))
 

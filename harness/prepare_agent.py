@@ -40,6 +40,9 @@ ANALYST_CONTRACT = """\
   `author_kind: analyst_app` comments are your own earlier output. Use the comment
   `ref` values as source refs. Use `product.areas` as the valid area keys.
 - **Repo.** Your working directory is the product repo at `main`, read-only.
+- **Revision history is append-only.** For a requirement that is already on main, copy its `revision`
+  entries exactly as they are there, in order, and only add new entries after them. A changed, dropped or
+  reordered entry fails the run (`revision_rewritten`).
 - **Output.** Return your one JSON object by calling the StructuredOutput tool exactly
   once. Write nothing else. The harness validates it and rejects anything else
   (S-SEC-003).
@@ -78,6 +81,9 @@ ARCHITECT_CONTRACT = """\
   truth: ready requirements, rules, the product core, accepted architecture.
 - **Reference.** `staff-engineering:architecture-reference` is preloaded above, so the
   on-demand reference is available in this run.
+- **Revision history is append-only.** For an element that is already on main, copy its `revision`
+  entries exactly as they are there, in order, and only add new entries after them. A changed, dropped or
+  reordered entry fails the run (`revision_rewritten`).
 - **Output.** Return your one JSON object by calling the StructuredOutput tool exactly
   once. Write nothing else. The harness validates it and rejects anything else
   (S-SEC-003).
