@@ -235,6 +235,16 @@ class CheckDeveloperTest(unittest.TestCase):
         self.assert_reason(load("developer-feature.json"), "not_ready", dev_input(body="Area: system\nREQ-013/AC-001"))
         self.assert_reason(load("developer-feature.json"), "kind_mismatch", dev_input(kind="fix", body="Area: system\nR-004"))
 
+    def test_question_order_is_fixed_not_failed(self):
+        from validate_output import order_questions
+        out = load("developer-feature.json")
+        q = {"key": {"entity": "x", "target_id": None, "attribute": "y"}, "blocks": ["REQ-012/AC-001"], "text": "t",
+             "options": [{"id": "a", "text": "a"}, {"id": "b", "text": "b"}], "recommended": "a"}
+        out["questions"] = [dict(q, id="Q-001", blocking=False, priority=2), dict(q, id="Q-002", blocking=True, priority=5)]
+        self.assertTrue(order_questions(out))
+        self.assertEqual([(x["id"], x["priority"]) for x in out["questions"]], [("Q-002", 1), ("Q-001", 2)])
+        self.assertFalse(order_questions(out))  # already in order: unchanged
+
     def test_bootstrap_and_fix_shapes(self):
         boot = load("developer-bootstrap.json")
         exp = dev_input(kind="bootstrap", body="Area: system", entry=None)
