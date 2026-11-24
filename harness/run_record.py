@@ -39,6 +39,13 @@ def plugin_versions(plugins_root):
     return out
 
 
+def dev_outcome(validated):
+    """The Developer's output has no outcome field; derive it as validate_output.py does."""
+    if not validated or validated.get("agent") != "developer":
+        return None
+    return "proposed" if validated["pr"] else "code_map" if validated["code_map"] else "no_code"
+
+
 def role_fields(validated):
     """Role fields from the validated output; IDs, counts and fixed codes only.
 
@@ -121,7 +128,7 @@ def build(args):
         "stage": args.stage,
         "area": validated["intake"]["area"] if validated and "intake" in validated else None,
         "status": "completed" if ok else STATUS_BY_REASON.get(reason, "crashed"),
-        "outcome": (validated.get("outcome") or validated.get("verdict")) if ok else "failed",
+        "outcome": (validated.get("outcome") or validated.get("verdict") or dev_outcome(validated)) if ok else "failed",
         "validation": {"ok": ok, "reason": None if ok else (reason or "read_job_failed")},
         "read_schema_version": validated["schema_version"] if validated else None,
         "plugin_versions": plugin_versions(args.plugins_root) if args.plugins_root else {},
