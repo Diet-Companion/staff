@@ -1,0 +1,103 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "developer",
+  "decision_summary": "Draft code-map entry for area orders, for the human to commit to .staff/code.yml.",
+  "pr": null,
+  "proposed_files": [],
+  "classification": null,
+  "defect_items": [],
+  "design_requests": [],
+  "questions": [],
+  "assumptions": [],
+  "private_reports": [],
+  "code_map": {
+    "area": "orders",
+    "entry": {
+      "source": [
+        "src/orders/**"
+      ],
+      "unit_tests": [
+        "tests/unit/orders/**"
+      ],
+      "generated": [],
+      "protected": [
+        "src/orders/auth/**",
+        "migrations/orders/**"
+      ],
+      "dependency_files": [
+        "pyproject.toml",
+        "uv.lock"
+      ],
+      "verification_config": [
+        "pyproject.toml",
+        ".ruff.toml"
+      ],
+      "guard_patterns": [
+        {
+          "stack": "python",
+          "test_decl": [
+            "^\\s*def test_"
+          ],
+          "assertion": [
+            "^\\s*assert\\b"
+          ],
+          "skip": [
+            "@pytest\\.mark\\.skip"
+          ],
+          "expected_failure": [
+            "@pytest\\.mark\\.xfail"
+          ],
+          "authorization": [
+            "require_role\\("
+          ],
+          "validation": [
+            "validate_"
+          ],
+          "permission_deny": [
+            "raise Forbidden"
+          ],
+          "lint_suppression": [
+            "# noqa"
+          ],
+          "testability": [
+            "correlation_id"
+          ]
+        }
+      ],
+      "test_list": [
+        {
+          "stack": "python",
+          "command": "pytest --collect-only -q tests/unit/orders"
+        }
+      ],
+      "generators": [],
+      "interface_source": "none",
+      "upkeep_tools": [
+        {
+          "tool_id": "ruff-format",
+          "kind": "formatter",
+          "version": "0.9.0",
+          "command": "ruff format"
+        }
+      ]
+    },
+    "evidence": [
+      {
+        "stack": "python",
+        "pattern_class": "test_decl",
+        "pattern": "^\\s*def test_",
+        "match_count": 42,
+        "samples": [
+          {
+            "path": "tests/unit/orders/test_cancel.py",
+            "line": 6,
+            "text": "def test_unshipped_order_can_be_cancelled():"
+          }
+        ]
+      }
+    ]
+  },
+  "source_refs": [
+    "example/shop#40"
+  ]
+}

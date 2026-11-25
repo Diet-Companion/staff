@@ -1,0 +1,62 @@
+{
+ "schema_version": "1.0.0",
+ "agent": "test-gen-api",
+ "decision_summary": "SI-001: cancelling a shipped order is accepted; R-004 refuses it. Two API tests for REQ-012.",
+ "pr": {
+  "kind": "tests",
+  "layer": "api",
+  "product_pr": null,
+  "base": "main",
+  "cited_ids": [
+   "REQ-012/AC-001",
+   "REQ-012/AC-002",
+   "R-004",
+   "IF-002@1.0.0#createOrder"
+  ],
+  "characterization": [],
+  "expected_failures": [
+   {
+    "test_id": "tests/api/orders.api.test.ts::orders API > refuses to cancel a shipped order",
+    "cites": [
+     "REQ-012/AC-002",
+     "R-004"
+    ],
+    "expected": "409 order.not_cancellable",
+    "actual": "200, the order is cancelled",
+    "evidence_refs": [
+     "src/orders.ts:L40"
+    ]
+   }
+  ]
+ },
+ "proposed_files": [
+  {
+   "path": "tests/api/orders.api.test.ts",
+   "op": "add",
+   "content": [
+    "import { afterAll, beforeAll, describe, expect, it } from \"vitest\";\nimport { startApi, type Api } from \"./support/api.js\";\n\nlet api: Api;\nbeforeAll(async () => { api = await startApi(); await api.login(); });\nafterAll(async () => { await api.close(); });\n\ndescribe(\"orders API\", () => {\n  // cites: REQ-012/AC-001, IF-002@1.0.0#createOrder\n  it(\"creates an order\", async () => {\n    const res = await api.request(\"POST\", \"/orders\", { item: \"Item A\" });\n    expect(res.statusCode).toBe(201);\n  });\n\n  // cites: REQ-012/AC-002, R-004\n  it(\"refuses to cancel a shipped order\", async () => {\n    const res = await api.request(\"POST\", \"/orders/shipped/cancel\");\n    expect(res.json().code).toBe(\"order.not_cancellable\");\n  });\n});\n"
+   ]
+  }
+ ],
+ "suspected_issues": [
+  {
+   "id": "SI-001",
+   "test_id": "tests/api/orders.api.test.ts::orders API > refuses to cancel a shipped order",
+   "cites": [
+    "REQ-012/AC-002",
+    "R-004"
+   ],
+   "text": "The cancel route doesn't check the shipped state."
+  }
+ ],
+ "defect_items": [],
+ "questions": [],
+ "assumptions": [],
+ "private_reports": [],
+ "source_refs": [
+  "REQ-012/AC-001",
+  "REQ-012/AC-002",
+  "R-004",
+  "src/orders.ts:L40"
+ ]
+}

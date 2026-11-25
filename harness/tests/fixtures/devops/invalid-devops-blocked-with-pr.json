@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "devops",
+  "trigger": {
+    "kind": "arch_change",
+    "ref": "example/shop@main",
+    "fixup_round": 0
+  },
+  "outcome": "blocked",
+  "decision_summary": "Blocked: .staff/delivery.yml has no entry for this stack. Add it or dispatch devops:bootstrap.",
+  "design_requests": [],
+  "defect_items": [],
+  "questions": [],
+  "assumptions": [],
+  "private_reports": [],
+  "source_refs": [
+    ".staff/delivery.yml"
+  ],
+  "blocked": {
+    "reason": "no_delivery_entry",
+    "detail": "No iac stack in .staff/delivery.yml covers infra/**."
+  },
+  "pr": {
+    "kind": "pipeline",
+    "ticket": "example/shop#41",
+    "cites": [
+      "CMP-003",
+      "ADR-002/C-001"
+    ],
+    "environments": [
+      "ephemeral"
+    ],
+    "plan_refs": [
+      "ci-artifact:plan-ephemeral"
+    ],
+    "pins": [
+      {
+        "name": "actions/example-cache",
+        "from": null,
+        "to": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signoff_ref": null
+      }
+    ],
+    "flags": [
+      {
+        "flag_id": "pipeline/ci.yml/build/new-dependency",
+        "reason": "New action pinned by digest; needs a devops:dependency sign-off (S-SEC-009)."
+      }
+    ]
+  }
+}

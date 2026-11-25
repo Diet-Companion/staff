@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "arch-upkeep",
+  "run": { "date": "2026-11-21", "overview_batch": true, "changes": ["pr#50", "pr#52"] },
+  "decision_summary": "Check first: src/orders/export/ is unmapped (candidate CMP-002). Overview section main-flows updated for ADR-004. pr#50 moved CMP-002 code to src/orders/core/.",
+  "component_patches": [
+    { "cmp_id": "CMP-002", "area": "orders", "code_paths_added": ["src/orders/core/**"], "code_paths_removed": ["src/orders/legacy/**"], "evidence_refs": ["pr#50"] }
+  ],
+  "overview_sections": [
+    { "section_id": "main-flows", "text": "Order-status reads go through CMP-007 on a read replica (ADR-004)." }
+  ],
+  "unmapped": [
+    { "path": "src/orders/export/**", "candidate_cmp": "CMP-002", "reason": "pr#52 added it under the orders tree with no component claiming it." }
+  ],
+  "areas_done": ["orders"],
+  "areas_deferred": [],
+  "source_refs": ["pr#50", "pr#52", "CMP-002", "ADR-004"]
+}

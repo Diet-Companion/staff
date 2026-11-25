@@ -12,7 +12,7 @@ import sys
 REASONS = {
     # contract and input (build_input.py, contract.py, redact_check.py)
     "contract_invalid", "not_operator", "input_fetch_failed", "input_invalid",
-    "input_too_large", "input_redaction",
+    "input_too_large", "input_redaction", "nothing_to_review",
     # agent preparation (prepare_agent.py)
     "agent_invalid",
     # model run (workflow)
@@ -21,9 +21,23 @@ REASONS = {
     "envelope_invalid", "cost_unknown", "cost_cap", "max_turns", "budget_exceeded",
     "model_error", "no_output", "output_not_json", "schema_invalid",
     "multiple_epics", "parent_mismatch", "blocking_order", "duplicate_id",
-    "ac_id_mismatch", "recommended_not_option", "unknown_area", "stage_violation",
-    # redaction of the output (redact_check.py)
+    "ac_id_mismatch", "recommended_not_option", "unknown_area", "stage_violation", "revision_rewritten",
+    # reviewer output (validate_output.py --agent reviewer)
+    "type_mismatch", "target_mismatch", "sha_mismatch", "finding_id_invalid", "severity_order",
+    "unknown_finding",
+    # architect output (validate_output.py --agent architect)
+    "trigger_mismatch", "constraint_id_mismatch", "option_mismatch", "owner_field_set", "spec_invalid",
+    "unknown_reference",
+    # developer (dev_bundle.py, code_map.py, validate_output.py --agent developer, work_sandbox.py)
+    "code_map_invalid", "kind_mismatch", "ticket_mismatch", "not_ready", "path_out_of_scope", "flag_missing",
+    "case_clash",
+    "ac_not_ready", "sandbox_failed",
+    # test engineer (qa_bundle.py, test_map.py, validate_output.py --agent test-gen-api)
+    "test_map_invalid", "citation_missing", "cite_invalid",
+    # redaction of the output (redact_check.py, check_transcript.py)
     "redaction_hit",
+    # interview transcripts (check_transcript.py)
+    "transcript_invalid",
     # write stage and bookkeeping
     "record_failed", "read_job_failed", "artifact_missing", "render_failed", "render_too_large",
     # outcome store and review log (append_run_log.py, log_review.py, report.py)

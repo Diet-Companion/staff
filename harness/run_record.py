@@ -39,10 +39,85 @@ def plugin_versions(plugins_root):
     return out
 
 
+def dev_outcome(validated):
+    """The Developer's output has no outcome field; derive it as validate_output.py does."""
+    if not validated:
+        return None
+    if str(validated.get("agent", "")).startswith("test-gen"):
+        return "proposed" if validated["pr"] else "no_tests"
+    if validated.get("agent") != "developer":
+        return None
+    return "proposed" if validated["pr"] else "code_map" if validated["code_map"] else "no_code"
+
+
 def role_fields(validated):
-    """BA role fields (S-BA-039) from the validated output; IDs and counts only."""
+    """Role fields from the validated output; IDs, counts and fixed codes only.
+
+    Analyst: the BA fields (S-BA-039). Reviewer: the readiness verdict and the
+    finding IDs with their classifications (S-BA-032), as the gate check reads them.
+    """
     if not validated:
         return {}
+    if validated.get("agent") == "architect":
+        arts = validated["artifacts"]
+        by = lambda kind: [a["id"] for a in arts if a["type"] == kind]
+        adrs = [a for a in arts if a["type"] == "adr"]
+        return {  # S-ARCH-040
+            "req_ids": sorted({r for a in arts for r in (a.get("drivers") or ([a["req"]] if a.get("req") else []))
+                               if str(r).startswith("REQ-")}),
+            "adr_ids": by("adr"), "cmp_ids": by("component"), "qas_ids": by("qas"),
+            "if_versions": [f"{a['id']}@{v['version']}" for a in arts if a["type"] == "interface" for v in a["versions"]],
+            "options_count": {a["id"]: len(a["options"]) for a in adrs},
+            "recommended_option": {a["id"]: a["recommended"]["option"] for a in adrs},
+            "compat_class": None,  # set by the compatibility check, not the agent (S-ARCH-022)
+            "defect_items_raised": len(validated["defect_items"]),
+            "drift_ids": [q["drift_id"] for q in validated["questions"] if q.get("drift_id")],
+            "question_ids": [q["id"] for q in validated["questions"]],
+        }
+    if validated.get("agent") == "developer":
+        pr = validated["pr"] or {}
+        return {
+            "kind": pr.get("kind"),
+            "ac_ids": [a["ac"] for a in pr.get("implements_acs") or []],
+            "if_versions": list(pr.get("implements") or []),
+            "files": len(validated["proposed_files"]),
+            "flags": len(pr.get("flags") or []),
+            "dependencies": len(pr.get("dependencies") or []),
+            "classification": (validated["classification"] or {}).get("kind"),
+            "code_map_area": (validated["code_map"] or {}).get("area"),
+            "design_requests": len(validated["design_requests"]),
+            "defect_items_raised": len(validated["defect_items"]),
+            "private_reports": len(validated.get("private_reports_withheld") or []),
+            "question_ids": [q["id"] for q in validated["questions"]],
+        }
+    if str(validated.get("agent", "")).startswith("test-gen"):
+        pr = validated["pr"] or {}
+        test_files = len(validated["proposed_files"])
+        return {  # S-QA-046, stage-1 subset
+            "layer": pr.get("layer"),
+            "product_pr": pr.get("product_pr"),
+            "cited_ids": list(pr.get("cited_ids") or []),
+            "files": test_files,
+            "characterization_tests": len(pr.get("characterization") or []),
+            "expected_failures": len(pr.get("expected_failures") or []),
+            "suspected_issues": len(validated["suspected_issues"]),
+            "defect_items_raised": len(validated["defect_items"]),
+            "private_reports": len(validated.get("private_reports_withheld") or []),
+            "question_ids": [q["id"] for q in validated["questions"]],
+        }
+    if validated.get("agent") == "reviewer":
+        return {
+            "artifact_type": validated["artifact_type"],
+            "target_ref": validated["target"]["ref"],
+            "reviewed_sha": validated["reviewed_sha"],
+            "readiness_verdict": validated["verdict"],
+            "findings": [{"id": f["finding_id"], "severity": f["severity"],
+                          "classification": f["classification"]} for f in validated["findings"]],
+            "question_ids": [q["id"] for q in validated["questions"]],
+            "blocking_questions": sum(1 for q in validated["questions"] if q["blocking"]),
+            "proposed_changes": len(validated.get("proposed_changes", [])),
+            "test_conditions": len(validated.get("test_conditions", [])),
+        }
     reqs = validated["requirements"]
     return {
         "req_ids": [r["id"] for r in reqs],
@@ -70,9 +145,9 @@ def build(args):
         "plugin": args.plugin,
         "agent": args.agent,
         "stage": args.stage,
-        "area": validated["intake"]["area"] if validated else None,
+        "area": validated["intake"]["area"] if validated and "intake" in validated else None,
         "status": "completed" if ok else STATUS_BY_REASON.get(reason, "crashed"),
-        "outcome": validated["outcome"] if ok else "failed",
+        "outcome": (validated.get("outcome") or validated.get("verdict") or dev_outcome(validated)) if ok else "failed",
         "validation": {"ok": ok, "reason": None if ok else (reason or "read_job_failed")},
         "read_schema_version": validated["schema_version"] if validated else None,
         "plugin_versions": plugin_versions(args.plugins_root) if args.plugins_root else {},
@@ -113,7 +188,7 @@ def main():
     w.add_argument("--model", required=True)
     w.add_argument("--staff-sha", required=True)
     w.add_argument("--product-sha", required=True)
-    w.add_argument("--trigger-type", required=True, choices=["label", "comment"])
+    w.add_argument("--trigger-type", required=True, choices=["label", "comment", "pull_request"])
     w.add_argument("--trigger-ref", required=True)
     w.add_argument("--input", help="the input file, hashed")
     w.add_argument("--result", help="validate_output.py result file")

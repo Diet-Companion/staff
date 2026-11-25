@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "ci-upkeep",
+  "trigger": {
+    "kind": "dispatch",
+    "ref": "dispatch:devops-upkeep/3",
+    "target": "Dockerfile"
+  },
+  "outcome": "no_change",
+  "decision_summary": "No actionable pin-report item for the target. No change.",
+  "pin_groups": [],
+  "tool_runs": [],
+  "handoffs": [],
+  "source_refs": [
+    "check:pin-report/weekly"
+  ]
+}

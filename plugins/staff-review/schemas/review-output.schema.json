@@ -1,0 +1,458 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-review:review-output:1.0.0",
+  "title": "Shared reviewer read-stage output",
+  "description": "Structured output of one reviewer/<artifact-type> run (S-GEN-030): the common read-stage fields that S-BA-037, S-ARCH-037, S-DEV-021, S-QA-044 and S-DEVOPS-013 define, plus each type's extras. The staff-core harness validates it and rejects any action outside the allowed set (S-SEC-002, S-SEC-003). Free-text fields are quoted data, at most 2,000 characters each (S-SEC-002). The output contract (verdict, at most 7 findings ordered by severity, derived finding IDs) is S-BA-032, which the other types adopt (S-ARCH-033, S-DEV-032, S-QA-044, S-DEVOPS-048).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "artifact_type",
+    "target",
+    "reviewed_sha",
+    "verdict",
+    "decision_summary",
+    "findings",
+    "questions",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "reviewer"
+    },
+    "artifact_type": {
+      "description": "The checklist this run used, chosen by the harness. One eval unit per type (S-GEN-030).",
+      "enum": ["requirements", "architecture", "code", "tests", "pipeline"]
+    },
+    "target": {
+      "description": "What was reviewed: a PR, or a ticket (ba:review on a ticket, S-BA-034; dev:review on a ticket holding a Developer stage-1 draft, S-DEV-006).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": { "enum": ["pull_request", "ticket"] },
+        "ref": { "$ref": "#/$defs/ref" }
+      }
+    },
+    "reviewed_sha": {
+      "description": "The commit reviewed; the gate checks match it to the head (S-BA-032, S-ARCH-019 item 6). null only for a ticket target.",
+      "anyOf": [{ "$ref": "#/$defs/sha" }, { "type": "null" }]
+    },
+    "verdict": {
+      "description": "Readiness verdict (S-BA-032). not_ready: a blocker finding or a blocking question. ready_with_questions: no blocker, at least one question, none blocking. ready: no blocker and no question. Never a human verdict (G12).",
+      "enum": ["ready", "ready_with_questions", "not_ready"]
+    },
+    "decision_summary": {
+      "description": "Required. The decisions the human has to make, first; then what was checked, what could only be checked within the PR (missing prerequisites), dropped findings and any suspected injection. Rendered first in the comment.",
+      "$ref": "#/$defs/text"
+    },
+    "findings": {
+      "description": "At most 7 *(starting value)*, ordered by severity, blocker first (S-BA-032).",
+      "type": "array",
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "questions": {
+      "description": "Questions in the S-BA-014 form: at most 7, blocking first.",
+      "type": "array",
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/question" }
+    },
+    "proposed_changes": {
+      "description": "requirements only: a proposed changes[] declaration for each undeclared contradiction or extension of an active rule (S-BA-031 step 4, S-BA-032). accepted_by stays human-owned and is not part of this output (S-BA-015).",
+      "type": "array",
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/proposed_change" }
+    },
+    "test_conditions": {
+      "description": "requirements only: draft test conditions v1 per reviewed AC (S-BA-048), candidate input for S-BA-050. Provisional IDs. At most 30 *(starting value)*.",
+      "type": "array",
+      "maxItems": 30,
+      "items": { "$ref": "#/$defs/test_condition" }
+    },
+    "private_reports": {
+      "description": "code and pipeline only: suspected vulnerabilities or exposed secrets, filed privately by the write stage and never rendered in the comment (S-SEC-011, S-DEV-019, S-DEVOPS-048). At most 3 *(starting value)*.",
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/private_report" }
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites.",
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/ref" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "target": { "properties": { "kind": { "const": "pull_request" } } } }
+      },
+      "then": { "properties": { "reviewed_sha": { "$ref": "#/$defs/sha" } } },
+      "else": { "properties": { "reviewed_sha": { "type": "null" } } }
+    },
+    {
+      "if": {
+        "properties": { "findings": { "contains": { "properties": { "severity": { "const": "blocker" } }, "required": ["severity"] } } },
+        "required": ["findings"]
+      },
+      "then": { "properties": { "verdict": { "const": "not_ready" } } }
+    },
+    {
+      "if": {
+        "properties": { "questions": { "contains": { "properties": { "blocking": { "const": true } }, "required": ["blocking"] } } },
+        "required": ["questions"]
+      },
+      "then": { "properties": { "verdict": { "const": "not_ready" } } }
+    },
+    {
+      "if": { "properties": { "verdict": { "const": "ready" } } },
+      "then": { "properties": { "questions": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "verdict": { "const": "ready_with_questions" } } },
+      "then": { "properties": { "questions": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "verdict": { "const": "not_ready" } } },
+      "then": {
+        "anyOf": [
+          { "properties": { "findings": { "contains": { "properties": { "severity": { "const": "blocker" } }, "required": ["severity"] } } } },
+          { "properties": { "questions": { "contains": { "properties": { "blocking": { "const": true } }, "required": ["blocking"] } } } }
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "artifact_type": { "const": "requirements" } } },
+      "then": {
+        "required": ["proposed_changes", "test_conditions"],
+        "properties": {
+          "findings": {
+            "items": {
+              "required": ["rewording"],
+              "properties": {
+                "checklist_id": { "pattern": "^RC-[1-9]$" },
+                "suggestion": false,
+                "classification": { "enum": ["contradicts", "extends", "duplicate", "ambiguous_overlap", "issue"] }
+              }
+            }
+          },
+          "private_reports": false
+        }
+      }
+    },
+    {
+      "if": { "properties": { "artifact_type": { "const": "architecture" } } },
+      "then": {
+        "properties": {
+          "findings": {
+            "items": {
+              "required": ["rewording"],
+              "properties": {
+                "checklist_id": { "pattern": "^AR-([1-9]|10)$" },
+                "suggestion": false,
+                "domain_source_stale": false,
+                "classification": { "enum": ["conflicts", "issue"] }
+              }
+            }
+          },
+          "proposed_changes": false,
+          "test_conditions": false,
+          "private_reports": false
+        }
+      }
+    },
+    {
+      "if": { "properties": { "artifact_type": { "const": "code" } } },
+      "then": {
+        "required": ["private_reports"],
+        "properties": {
+          "findings": {
+            "items": {
+              "required": ["suggestion"],
+              "properties": {
+                "checklist_id": { "pattern": "^CC-[1-9]$" },
+                "rewording": false,
+                "domain_source_stale": false,
+                "classification": { "enum": ["conflicts", "issue"] }
+              }
+            }
+          },
+          "private_reports": { "items": { "properties": { "checklist_id": { "pattern": "^CC-[1-9]$" } } } },
+          "proposed_changes": false,
+          "test_conditions": false
+        }
+      }
+    },
+    {
+      "if": { "properties": { "artifact_type": { "const": "tests" } } },
+      "then": {
+        "properties": {
+          "findings": {
+            "items": {
+              "required": ["suggestion"],
+              "properties": {
+                "checklist_id": { "pattern": "^TR-[1-9]$" },
+                "rewording": false,
+                "domain_source_stale": false,
+                "classification": { "const": "issue" }
+              }
+            }
+          },
+          "proposed_changes": false,
+          "test_conditions": false,
+          "private_reports": false
+        }
+      }
+    },
+    {
+      "if": { "properties": { "artifact_type": { "const": "pipeline" } } },
+      "then": {
+        "required": ["private_reports"],
+        "properties": {
+          "findings": {
+            "items": {
+              "required": ["suggestion"],
+              "properties": {
+                "checklist_id": { "pattern": "^PL-([1-9]|10)$" },
+                "rewording": false,
+                "domain_source_stale": false,
+                "classification": { "const": "issue" }
+              }
+            }
+          },
+          "private_reports": { "items": { "properties": { "checklist_id": { "pattern": "^PL-([1-9]|10)$" } } } },
+          "proposed_changes": false,
+          "test_conditions": false
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "ref": {
+      "description": "A source or location ref: PR, ticket, comment, file path with line or symbol, check output, CI result, or an artifact ID.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "sha": {
+      "description": "A full commit SHA (SHA-1, or SHA-256 for SHA-256 repos).",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"
+    },
+    "checklist_id": {
+      "description": "A checklist item ID: RC (S-BA-029), AR (S-ARCH-031), CC (S-DEV-031), TR (S-QA-043), PL (S-DEVOPS-047). The type's branch narrows it.",
+      "type": "string",
+      "maxLength": 5, "pattern": "^(RC|AR|CC|TR|PL)-[0-9]{1,2}$"
+    },
+    "cited_id": {
+      "description": "A strategy decision, guardrail or product artifact ID: S-<AREA>-NNN, OD-<AREA>-n, G1-G12, REQ-n[/AC-m[/TC-k]], R-n, INT-n[#Tk], ADR-n[/C-k], CMP-n, IF-n[@x.y.z[#element]], QAS-n.",
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^(S-[A-Z]+-[0-9]{3}|OD-[A-Z]+-[0-9]+|G([1-9]|1[0-2])|REQ-[0-9]{3,}(/AC-[0-9]{3,}(/TC-[0-9]{3,})?)?|R-[0-9]{3,}|INT-[0-9]{3,}(#T[0-9]+)?|ADR-[0-9]{3,}(/C-[0-9]+)?|CMP-[0-9]{3,}|IF-[0-9]{3,}(@[0-9]+\\.[0-9]+\\.[0-9]+(#[A-Za-z0-9_.:/-]{1,200})?)?|QAS-[0-9]{3,})$"
+    },
+    "cited_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/cited_id" }
+    },
+    "finding": {
+      "description": "One finding (S-BA-032). requirements and architecture carry a suggested rewording; code, tests and pipeline a suggestion.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_id", "checklist_id", "severity", "location", "text", "cited_ids", "evidence_refs", "classification"],
+      "properties": {
+        "finding_id": {
+          "description": "Derived, stable across re-reviews: <checklist ID>|<location key>|<primary cited ID> (S-BA-032, S-ARCH-033, S-DEV-032, S-QA-044, S-DEVOPS-048). The location key is set per type by the checklist skill.",
+          "type": "string",
+          "maxLength": 520,
+          "pattern": "^(RC|AR|CC|TR|PL)-[0-9]{1,2}\\|[^|\\n]{1,300}\\|[^|\\s]{1,200}$"
+        },
+        "checklist_id": { "$ref": "#/$defs/checklist_id" },
+        "severity": {
+          "description": "blocker: contradicts truth or breaks a security, data, verification or gate rule; forces not_ready. major: a real defect that breaks no binding rule. minor: clarity, convention, maintainability.",
+          "enum": ["blocker", "major", "minor"]
+        },
+        "location": {
+          "description": "Where in the target: an AC or field path, or a file with line or symbol.",
+          "$ref": "#/$defs/ref"
+        },
+        "text": {
+          "description": "What is wrong and why. Never a secret or personal data; refer to its location (S-SEC-004).",
+          "$ref": "#/$defs/text"
+        },
+        "rewording": {
+          "description": "requirements and architecture: the suggested rewording.",
+          "$ref": "#/$defs/text"
+        },
+        "suggestion": {
+          "description": "code, tests and pipeline: the suggested change.",
+          "$ref": "#/$defs/text"
+        },
+        "cited_ids": {
+          "description": "The rules, decisions or artifacts the finding rests on, primary first.",
+          "$ref": "#/$defs/cited_ids"
+        },
+        "evidence_refs": {
+          "description": "Where the evidence is: diff hunks, files and lines, check outputs, CI results, cited source files.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "classification": {
+          "description": "Read by the gate checks. requirements: the S-BA-031 pair class for RC-4 and RC-5 (contradicts, extends, duplicate, ambiguous_overlap), else issue; every contradicts needs a review_dispositions entry. architecture: conflicts for AR-1 (S-ARCH-019 item 6). code: conflicts for CC-2, a violated ADR constraint. Everything else: issue.",
+          "enum": ["contradicts", "extends", "duplicate", "ambiguous_overlap", "conflicts", "issue"]
+        },
+        "domain_source_stale": {
+          "description": "requirements RC-8 only: the domain plugin relied on was last reviewed more than 12 months ago *(starting value)* (S-BA-026).",
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "classification": { "enum": ["contradicts", "extends", "duplicate", "ambiguous_overlap"] } } },
+          "then": { "properties": { "checklist_id": { "enum": ["RC-4", "RC-5"] } } }
+        },
+        {
+          "if": { "properties": { "classification": { "const": "conflicts" } } },
+          "then": { "properties": { "checklist_id": { "enum": ["AR-1", "CC-2"] } } }
+        },
+        {
+          "if": { "required": ["domain_source_stale"] },
+          "then": { "properties": { "checklist_id": { "const": "RC-8" } } }
+        }
+      ]
+    },
+    "key": {
+      "description": "What a question is about (S-BA-007, S-BA-014). Optional outside requirements.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "target_id", "attribute"],
+      "properties": {
+        "entity": { "$ref": "#/$defs/short_text" },
+        "target_id": {
+          "type": ["string", "null"],
+          "maxLength": 200
+        },
+        "attribute": { "$ref": "#/$defs/short_text" }
+      }
+    },
+    "question": {
+      "description": "One question in the S-BA-014 form. The recommended option is shown to the human and never applied without an answer (S-BA-015).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "blocks", "blocking", "text", "options", "recommended", "priority"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 12, "pattern": "^Q-[0-9]{3,}$" },
+        "key": { "$ref": "#/$defs/key" },
+        "blocks": {
+          "description": "The artifact IDs, locations or finding IDs this question blocks.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "blocking": {
+          "description": "True when the target can't be ready until it is answered. Blocking questions come first.",
+          "type": "boolean"
+        },
+        "text": { "$ref": "#/$defs/text" },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "text"],
+            "properties": {
+              "id": { "type": "string", "maxLength": 1, "pattern": "^[a-d]$" },
+              "text": { "$ref": "#/$defs/text" }
+            }
+          }
+        },
+        "recommended": { "type": "string", "maxLength": 1, "pattern": "^[a-d]$" },
+        "priority": {
+          "description": "Position, 1 first.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      }
+    },
+    "proposed_change": {
+      "description": "A changes[] declaration the requirement should carry (S-BA-006, S-BA-031 step 4).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_id", "requirement", "rule", "kind", "proposed_statement", "cites"],
+      "properties": {
+        "finding_id": { "type": "string", "maxLength": 520 },
+        "requirement": { "type": "string", "maxLength": 16, "pattern": "^REQ-[0-9]{3,}$" },
+        "rule": {
+          "anyOf": [
+            { "type": "string", "maxLength": 16, "pattern": "^R-[0-9]{3,}$" },
+            { "const": "new" }
+          ]
+        },
+        "kind": { "enum": ["add", "modify", "retire"] },
+        "proposed_statement": { "$ref": "#/$defs/text" },
+        "cites": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/ref" }
+        }
+      }
+    },
+    "test_condition": {
+      "description": "Test conditions v1 (S-BA-048), the schema staff-qa consumes (S-GEN-022, S-QA-010).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ac", "kind", "given", "when", "then", "cites"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 48, "pattern": "^REQ-[0-9]{3,}/AC-[0-9]{3,}/TC-[0-9]{3,}$" },
+        "ac": { "type": "string", "maxLength": 32, "pattern": "^REQ-[0-9]{3,}/AC-[0-9]{3,}$" },
+        "kind": { "enum": ["positive", "negative", "boundary"] },
+        "given": { "type": "array", "minItems": 1, "maxItems": 10, "items": { "$ref": "#/$defs/text" } },
+        "when": { "$ref": "#/$defs/text" },
+        "then": { "type": "array", "minItems": 1, "maxItems": 10, "items": { "$ref": "#/$defs/text" } },
+        "cites": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/ref" }
+        }
+      }
+    },
+    "private_report": {
+      "description": "A suspected vulnerability or exposed secret (S-SEC-011). The write stage files it privately and puts only a pointer in the digest. Refer to a secret by location, never by value (S-SEC-004).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "checklist_id", "location", "text", "cited_ids"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 12, "pattern": "^P-[0-9]{3,}$" },
+        "checklist_id": { "$ref": "#/$defs/checklist_id" },
+        "location": { "$ref": "#/$defs/ref" },
+        "text": { "$ref": "#/$defs/text" },
+        "cited_ids": { "$ref": "#/$defs/cited_ids" }
+      }
+    }
+  }
+}

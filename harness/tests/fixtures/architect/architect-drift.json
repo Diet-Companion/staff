@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "architect",
+  "trigger": { "kind": "nightly", "ref": "drift-report:orders:2026-11-21", "area": "orders" },
+  "outcome": "drift",
+  "decision_summary": "Decide first: Q-003, a new dependency from CMP-002 to CMP-005 that ADR-002/C-001 forbids. Recommended a (fix the code).",
+  "artifacts": [],
+  "spec_versions": [],
+  "conflicts": [],
+  "defect_items": [],
+  "questions": [
+    {
+      "id": "Q-003",
+      "key": { "entity": "component", "target_id": "CMP-002", "attribute": "allowed_dependencies" },
+      "drift_id": "ADR-002/C-001:src/orders/core/notify.ts",
+      "blocks": ["ADR-002/C-001"],
+      "blocking": false,
+      "text": "src/orders/core/notify.ts in CMP-002 imports CMP-005, which ADR-002/C-001 forbids. Which repair?",
+      "options": [
+        {
+          "id": "a",
+          "text": "Fix the code: route the call through IF-002.",
+          "action": "fix_code",
+          "work_ticket": { "title": "Remove the CMP-002 to CMP-005 import", "body": "Route the notification through IF-002 as ADR-002/C-001 requires.", "cites": ["ADR-002/C-001"] }
+        },
+        { "id": "b", "text": "Change the design: a superseding ADR that allows the dependency.", "action": "change_design" },
+        { "id": "c", "text": "Time-bound exception for this path, expiring within 90 days.", "action": "exception" }
+      ],
+      "recommended": "a",
+      "priority": 1
+    }
+  ],
+  "assumptions": [],
+  "answers_applied": [],
+  "source_refs": ["drift-report:orders:2026-11-21", "ADR-002", "CMP-002"]
+}

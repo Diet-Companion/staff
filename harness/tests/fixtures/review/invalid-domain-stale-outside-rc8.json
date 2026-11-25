@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "reviewer",
+  "artifact_type": "requirements",
+  "target": {
+    "kind": "pull_request",
+    "ref": "pr#41"
+  },
+  "reviewed_sha": "4b8e1c0d9a7f6e5d4c3b2a1908f7e6d5c4b3a291",
+  "verdict": "not_ready",
+  "decision_summary": "Decide first: REQ-012/AC-003 contradicts the active rule R-007 and no change is declared. Accept the proposed modify declaration, or reword the AC. Checked RC-1 to RC-9 against the area's rules registry; RC-8 had no domain plugin for this area.",
+  "findings": [
+    {
+      "finding_id": "RC-4|REQ-012/AC-003|R-007",
+      "checklist_id": "RC-4",
+      "severity": "blocker",
+      "location": "requirements/orders/REQ-012.md#acceptance_criteria[AC-003]",
+      "text": "The AC allows cancelling an order after dispatch; R-007 says a dispatched order cannot be cancelled. No changes[] entry declares the difference.",
+      "rewording": "Given a dispatched order, when the customer requests cancellation, then the request is refused with error ORDER_ALREADY_DISPATCHED.",
+      "cited_ids": [
+        "R-007",
+        "S-BA-031"
+      ],
+      "evidence_refs": [
+        "requirements/orders/REQ-012.md:L48",
+        "knowledge/rules/orders/R-007.md"
+      ],
+      "classification": "contradicts"
+    },
+    {
+      "finding_id": "RC-2|REQ-012/AC-002|S-BA-007",
+      "checklist_id": "RC-2",
+      "severity": "major",
+      "location": "requirements/orders/REQ-012.md#acceptance_criteria[AC-002]",
+      "text": "AC-002 relies on the order-limit condition of R-004 but no negative or boundary AC covers the limit.",
+      "rewording": "Add a boundary AC: given a basket at the order limit, when one more item is added, then the add is refused.",
+      "cited_ids": [
+        "S-BA-007",
+        "R-004"
+      ],
+      "evidence_refs": [
+        "requirements/orders/REQ-012.md:L35"
+      ],
+      "classification": "issue",
+      "domain_source_stale": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-001",
+      "blocks": [
+        "REQ-012/AC-003"
+      ],
+      "blocking": true,
+      "text": "Should customers be able to cancel a dispatched order?",
+      "options": [
+        {
+          "id": "a",
+          "text": "Option A: keep the current wording."
+        },
+        {
+          "id": "b",
+          "text": "Option B: narrow it as the finding suggests."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1,
+      "key": {
+        "entity": "order",
+        "target_id": "cancelOrder",
+        "attribute": "cancellable_after_dispatch"
+      }
+    }
+  ],
+  "proposed_changes": [
+    {
+      "finding_id": "RC-4|REQ-012/AC-003|R-007",
+      "requirement": "REQ-012",
+      "rule": "R-007",
+      "kind": "modify",
+      "proposed_statement": "A dispatched order can be cancelled until it is delivered.",
+      "cites": [
+        "requirements/orders/REQ-012.md:L48"
+      ]
+    }
+  ],
+  "test_conditions": [
+    {
+      "id": "REQ-012/AC-002/TC-001",
+      "ac": "REQ-012/AC-002",
+      "kind": "positive",
+      "given": [
+        "A customer with an open basket below the order limit"
+      ],
+      "when": "The customer adds one item",
+      "then": [
+        "The item is in the basket"
+      ],
+      "cites": [
+        "REQ-012/AC-002"
+      ]
+    }
+  ],
+  "source_refs": [
+    "pr#41",
+    "requirements/orders/REQ-012.md",
+    "knowledge/rules/orders/R-007.md",
+    "knowledge/rules/orders/R-004.md",
+    "knowledge/product-core.md"
+  ]
+}

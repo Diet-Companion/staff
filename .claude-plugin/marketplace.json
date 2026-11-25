@@ -16,6 +16,30 @@
       "source": "./plugins/staff-product",
       "description": "Business-analyst agents. Lean slice: the Analyst read stage at stage 1.",
       "version": "0.1.0"
+    },
+    {
+      "name": "staff-engineering",
+      "source": "./plugins/staff-engineering",
+      "description": "Architect, developer and DevOps agents. Built at stage 1; not wired to any workflow yet.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "staff-qa",
+      "source": "./plugins/staff-qa",
+      "description": "Test engineer agents. Stage 1: test-gen-api (API-layer tests) only.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "staff-review",
+      "source": "./plugins/staff-review",
+      "description": "Shared reviewer with one checklist skill per artifact type. The requirements checklist is wired (reviewer/requirements, stage 1).",
+      "version": "0.1.0"
+    },
+    {
+      "name": "staff-meta",
+      "source": "./plugins/staff-meta",
+      "description": "Meta agents. First: the seeding agent for the Developer's eval sets.",
+      "version": "0.1.0"
     }
   ]
 }

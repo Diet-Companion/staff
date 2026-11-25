@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "ci-upkeep",
+  "trigger": {
+    "kind": "dispatch",
+    "ref": "dispatch:devops-upkeep/3",
+    "target": "Dockerfile"
+  },
+  "outcome": "no_change",
+  "decision_summary": "No actionable pin-report item for the target. No change.",
+  "pin_groups": [],
+  "tool_runs": [],
+  "handoffs": [],
+  "source_refs": [
+    "check:pin-report/weekly"
+  ],
+  "pr": {
+    "kind": "upkeep",
+    "ticket": "example/shop#60",
+    "cites": [],
+    "environments": [],
+    "plan_refs": [],
+    "pins": [
+      {
+        "name": "example/base-image",
+        "from": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "to": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "signoff_ref": "example/shop#30 comment 2"
+      },
+      {
+        "name": "example/runner",
+        "from": "v1.2.0@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "to": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "signoff_ref": null
+      }
+    ],
+    "flags": [
+      {
+        "flag_id": "pin/example/runner/sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "reason": "New version; needs sign-off (S-SEC-009)."
+      }
+    ]
+  }
+}

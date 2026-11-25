@@ -1,0 +1,719 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-engineering:dev-upkeep-output:1.0.0",
+  "title": "dev-upkeep read-stage output",
+  "description": "Structured output of the dev-upkeep read stage, read-only form (S-DEV-021, S-SEC-002, S-SEC-003). The harness runs tool_runs[] and applies proposed_files[] in the work sandbox (S-DEV-042), derives files[] from the workspace diff, and the write stage acts only on the validated result. Free-text fields and content chunks are at most 2,000 characters (S-SEC-002).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "decision_summary",
+    "pr",
+    "proposed_files",
+    "tool_runs",
+    "residual_edits",
+    "dependencies",
+    "handoffs",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "dev-upkeep"
+    },
+    "decision_summary": {
+      "description": "Required. What the human must decide first (dependency sign-offs, flags, handoffs), then prose (S-DEV-024).",
+      "$ref": "#/$defs/text"
+    },
+    "pr": {
+      "description": "The product-PR block with kind upkeep (S-DEV-009), or null for no change. ticket may be null on a scheduled run; the write stage then uses the area's weekly draft upkeep ticket (S-DEV-022).",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/pr"
+        }
+      ]
+    },
+    "proposed_files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/proposed_file"
+      },
+      "maxItems": 25,
+      "description": "Residual hand edits only, with full content (read-only form of S-DEV-021 files[]). Tool output comes from the harness running tool_runs[]."
+    },
+    "tool_runs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/tool_run"
+      },
+      "maxItems": 10
+    },
+    "residual_edits": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/residual_edit"
+      },
+      "maxItems": 25
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dependency"
+      },
+      "maxItems": 20,
+      "description": "Patch and minor bumps; the same list as pr.dependencies."
+    },
+    "handoffs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/handoff"
+      },
+      "maxItems": 7
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "pr": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "pr"
+        ]
+      },
+      "then": {
+        "properties": {
+          "pr": {
+            "properties": {
+              "kind": {
+                "const": "upkeep"
+              }
+            }
+          }
+        },
+        "anyOf": [
+          {
+            "properties": {
+              "tool_runs": {
+                "minItems": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "proposed_files": {
+                "minItems": 1
+              }
+            }
+          }
+        ]
+      },
+      "else": {
+        "properties": {
+          "tool_runs": {
+            "maxItems": 0
+          },
+          "proposed_files": {
+            "maxItems": 0
+          },
+          "residual_edits": {
+            "maxItems": 0
+          },
+          "dependencies": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "ref": {
+      "description": "A source ref: ticket, comment, CI or check result, REQ/AC/TC ID, R-ID, IF version or element, ADR-n/C-k, test ID, or repo path (with line).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "path": {
+      "description": "A repo-relative, normalised file path: no leading slash, no . or .. segment, no backslash or control character, not under .git/.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!\\.git/)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\x00-\\x1f\\\\]+$"
+    },
+    "chunk": {
+      "description": "One ordered chunk of a file's full content, at most 2,000 characters (S-DEV-021). No NUL: binary content is never passed.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "pattern": "^[^\\x00]*$"
+    },
+    "req_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^REQ-[0-9]{3,}$"
+    },
+    "ac_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^REQ-[0-9]{3,}/AC-[0-9]{3,}$"
+    },
+    "any_req_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^REQ-[0-9]{3,}(/AC-[0-9]{3,})?$"
+    },
+    "rule_id": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^R-[0-9]{3,}$"
+    },
+    "if_version": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "if_element": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+#[^\\s#]{1,200}$"
+    },
+    "adr_constraint": {
+      "type": "string",
+      "maxLength": 300,
+      "pattern": "^ADR-[0-9]{3,}/C-[0-9]{3,}$"
+    },
+    "fix_target": {
+      "description": "A dev:fix or drift target: a ready AC, an active rule, an element of an approved or deprecated version, or an ADR-n/C-k of an accepted ADR (S-DEV-007, S-DEV-009).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ac_id"
+        },
+        {
+          "$ref": "#/$defs/rule_id"
+        },
+        {
+          "$ref": "#/$defs/if_element"
+        },
+        {
+          "$ref": "#/$defs/adr_constraint"
+        }
+      ]
+    },
+    "test_id": {
+      "description": "Test ID v1, <path>::<name> as the area's test_list command prints it (S-DEV-045).",
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 500,
+      "pattern": "^[^\\s:][^\\x00-\\x1f]*::[^\\x00-\\x1f]+$"
+    },
+    "proposed_file": {
+      "description": "One file of the proposed change (read-only form of S-DEV-021 files[]). content is the file's full new content as ordered chunks, never a diff or a reference. The harness applies it in the work sandbox and derives files[] from the workspace diff (S-DEV-042).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "op",
+        "content"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "op": {
+          "enum": [
+            "add",
+            "modify",
+            "delete",
+            "rename"
+          ]
+        },
+        "from": {
+          "description": "rename only: the old path.",
+          "$ref": "#/$defs/path"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/chunk"
+          },
+          "maxItems": 50,
+          "description": "Ordered chunks; concatenated, they are the file byte for byte. Empty for delete (and for an empty file)."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "rename"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "from"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "from"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "delete"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "content": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "from",
+        "to",
+        "reason"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/short_text"
+        },
+        "from": {
+          "description": "null for an addition.",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/short_text"
+            }
+          ]
+        },
+        "to": {
+          "description": "null for a removal.",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/short_text"
+            }
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "flag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "flag_id",
+        "reason"
+      ],
+      "properties": {
+        "flag_id": {
+          "description": "The flag the code diff check is expected to raise, as (check, element) (S-DEV-028). The check prints the final ID.",
+          "$ref": "#/$defs/short_text"
+        },
+        "reason": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "pr": {
+      "description": "The product-PR block (S-DEV-009). At stage 1 it heads the draft comment; at stage 2 the PR body.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ticket",
+        "implements_acs",
+        "implements",
+        "fixes",
+        "constraints",
+        "untested_acs",
+        "not_unit_observable",
+        "characterization",
+        "dependencies",
+        "flags"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "feature",
+            "fix",
+            "drift",
+            "refactor",
+            "upkeep"
+          ]
+        },
+        "ticket": {
+          "description": "The ticket this change covers. One ticket, one area per PR (S-DEV-010).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "implements_acs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ac",
+              "part"
+            ],
+            "properties": {
+              "ac": {
+                "$ref": "#/$defs/ac_id"
+              },
+              "part": {
+                "enum": [
+                  "full",
+                  "partial"
+                ]
+              }
+            }
+          },
+          "maxItems": 20,
+          "description": "Required for feature. full only when every part of the AC is built (S-DEV-044)."
+        },
+        "implements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/if_version"
+          },
+          "maxItems": 10,
+          "description": "IF-n@x.y.z versions implemented (S-ARCH-021)."
+        },
+        "fixes": {
+          "description": "For fix and drift only (S-DEV-009).",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ticket",
+                "target"
+              ],
+              "properties": {
+                "ticket": {
+                  "$ref": "#/$defs/ref"
+                },
+                "target": {
+                  "$ref": "#/$defs/fix_target"
+                }
+              }
+            }
+          ]
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "disposition",
+              "reason"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/adr_constraint"
+              },
+              "disposition": {
+                "enum": [
+                  "conform",
+                  "n/a"
+                ]
+              },
+              "reason": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          },
+          "maxItems": 50,
+          "description": "Every check: review constraint of the accepted ADRs the touched components cite (S-ARCH-026)."
+        },
+        "untested_acs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ac",
+              "reason"
+            ],
+            "properties": {
+              "ac": {
+                "$ref": "#/$defs/ac_id"
+              },
+              "reason": {
+                "enum": [
+                  "other-layer",
+                  "not-unit-observable"
+                ]
+              }
+            }
+          },
+          "maxItems": 20
+        },
+        "not_unit_observable": {
+          "description": "fix only: a defect no unit test can observe, with the test gap for QA. A flagged diff (S-DEV-010, S-DEV-018).",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "target",
+                "test_gap"
+              ],
+              "properties": {
+                "target": {
+                  "$ref": "#/$defs/fix_target"
+                },
+                "test_gap": {
+                  "$ref": "#/$defs/text"
+                }
+              }
+            }
+          ]
+        },
+        "characterization": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/test_id"
+          },
+          "maxItems": 50,
+          "description": "Characterization tests added (S-DEV-015)."
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dependency"
+          },
+          "maxItems": 20,
+          "description": "Every dependency_files change; each is flagged and labelled dev:dependency (S-DEV-018, S-SEC-009)."
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/flag"
+          },
+          "maxItems": 50,
+          "description": "Every diff the code diff check is expected to flag, with the reason (S-DEV-018)."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "feature"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "implements_acs": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "fix",
+                  "drift"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fixes": {
+                "type": "object"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "fixes": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "fix"
+              }
+            }
+          },
+          "then": {},
+          "else": {
+            "properties": {
+              "not_unit_observable": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "refactor",
+                  "upkeep"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "implements_acs": {
+                "maxItems": 0
+              },
+              "untested_acs": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "tool_run": {
+      "description": "One upkeep_tools run for the harness to execute and the replay check to re-run (S-DEV-030). tool_id and version as the base code map declares them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_id",
+        "version",
+        "paths"
+      ],
+      "properties": {
+        "tool_id": {
+          "$ref": "#/$defs/short_text"
+        },
+        "version": {
+          "$ref": "#/$defs/short_text"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/path"
+          },
+          "minItems": 1,
+          "maxItems": 500
+        }
+      }
+    },
+    "residual_edit": {
+      "description": "A hand edit beyond tool output; its full content is in proposed_files[] (S-DEV-021).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "reason"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "reason": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "handoff": {
+      "description": "A draft Developer ticket for work outside the upkeep lane, such as a protected path (S-DEV-005).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "paths",
+        "reason",
+        "evidence_refs"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/short_text"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/path"
+          },
+          "minItems": 1,
+          "maxItems": 50
+        },
+        "reason": {
+          "$ref": "#/$defs/text"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        }
+      }
+    }
+  }
+}

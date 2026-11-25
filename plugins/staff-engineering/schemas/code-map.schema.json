@@ -1,0 +1,357 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Diet-Companion/staff/plugins/staff-engineering/schemas/code-map.schema.json",
+  "title": ".staff/code.yml: the Developer's code map (S-DEV-004)",
+  "description": "Human-owned (S-GEN-025). DEV checks read it from the base branch. One entry per area key of .staff/areas.yml that holds code.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "areas"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "areas": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 50,
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "command": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "unit_tests",
+        "generated",
+        "protected",
+        "dependency_files",
+        "verification_config",
+        "guard_patterns",
+        "test_list",
+        "generators",
+        "interface_source",
+        "upkeep_tools"
+      ],
+      "properties": {
+        "source": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "maxItems": 50
+        },
+        "unit_tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "maxItems": 50
+        },
+        "generated": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "maxItems": 50
+        },
+        "protected": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "maxItems": 50
+        },
+        "dependency_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "maxItems": 50
+        },
+        "verification_config": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "maxItems": 50
+        },
+        "guard_patterns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stack",
+              "test_decl",
+              "assertion",
+              "skip",
+              "expected_failure",
+              "authorization",
+              "validation",
+              "permission_deny",
+              "lint_suppression",
+              "testability"
+            ],
+            "properties": {
+              "stack": {
+                "$ref": "#/$defs/stack"
+              },
+              "test_decl": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/regex"
+                },
+                "maxItems": 20
+              },
+              "assertion": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/regex"
+                },
+                "maxItems": 20
+              },
+              "skip": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/regex"
+                },
+                "maxItems": 20
+              },
+              "expected_failure": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/regex"
+                },
+                "maxItems": 20
+              },
+              "authorization": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/regex"
+                },
+                "maxItems": 20
+              },
+              "validation": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/regex"
+                },
+                "maxItems": 20
+              },
+              "permission_deny": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/regex"
+                },
+                "maxItems": 20
+              },
+              "lint_suppression": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/regex"
+                },
+                "maxItems": 20
+              },
+              "testability": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/regex"
+                },
+                "maxItems": 20
+              }
+            }
+          },
+          "maxItems": 10
+        },
+        "test_list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "stack",
+              "command"
+            ],
+            "properties": {
+              "stack": {
+                "$ref": "#/$defs/stack"
+              },
+              "command": {
+                "$ref": "#/$defs/command"
+              }
+            }
+          },
+          "maxItems": 10
+        },
+        "generators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "generator_id",
+              "version",
+              "command",
+              "inputs",
+              "outputs"
+            ],
+            "properties": {
+              "generator_id": {
+                "$ref": "#/$defs/short_text"
+              },
+              "version": {
+                "$ref": "#/$defs/short_text"
+              },
+              "command": {
+                "$ref": "#/$defs/command"
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/glob"
+                },
+                "minItems": 1,
+                "maxItems": 50
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/glob"
+                },
+                "minItems": 1,
+                "maxItems": 50
+              }
+            }
+          },
+          "maxItems": 20
+        },
+        "interface_source": {
+          "description": "A command, or none (S-DEV-012).",
+          "anyOf": [
+            {
+              "const": "none"
+            },
+            {
+              "$ref": "#/$defs/command"
+            }
+          ]
+        },
+        "upkeep_tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "tool_id",
+              "kind",
+              "version",
+              "command"
+            ],
+            "properties": {
+              "tool_id": {
+                "$ref": "#/$defs/short_text"
+              },
+              "kind": {
+                "enum": [
+                  "formatter",
+                  "linter_autofix",
+                  "codemod"
+                ]
+              },
+              "version": {
+                "$ref": "#/$defs/short_text"
+              },
+              "command": {
+                "$ref": "#/$defs/command"
+              }
+            }
+          },
+          "maxItems": 20
+        },
+        "sandbox": {
+          "$ref": "#/$defs/sandbox"
+        }
+      },
+      "description": "One area's entry (S-DEV-004). The same form as the Developer's dev:bootstrap draft (developer-output code_map.entry)."
+    },
+    "glob": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "path": {
+      "description": "A repo-relative, normalised file path: no leading slash, no . or .. segment, no backslash or control character, not under .git/.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "pattern": "^(?!/)(?!\\.git/)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\x00-\\x1f\\\\]+$"
+    },
+    "regex": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "sandbox": {
+      "description": "Harness extension, optional: the commands the stage-1 work sandbox runs on the base and on the proposed change (S-DEV-042). Without it the sandbox only applies the change and reports it untested.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "setup",
+        "build",
+        "unit_test",
+        "unit_report"
+      ],
+      "properties": {
+        "setup": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/command"
+          },
+          "maxItems": 10,
+          "description": "Install dependencies, from the lockfile where one exists."
+        },
+        "build": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/command"
+          },
+          "maxItems": 10,
+          "description": "Type-check and build. Every command must exit 0."
+        },
+        "unit_test": {
+          "$ref": "#/$defs/command",
+          "description": "Runs the area's unit tests and writes a JUnit XML report to unit_report. Its exit code is ignored; results come from the report."
+        },
+        "unit_report": {
+          "$ref": "#/$defs/path",
+          "description": "Where unit_test writes its JUnit XML report, relative to the repo root."
+        }
+      }
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "stack": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9+_.-]{0,63}$"
+    }
+  }
+}

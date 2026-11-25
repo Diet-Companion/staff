@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "developer",
+  "decision_summary": "Decide first: defect item on REQ-012/AC-004 (contradicts R-004). No code until the requirement is ready again.",
+  "pr": {
+    "kind": "feature",
+    "ticket": "example/shop#21",
+    "implements_acs": [
+      {
+        "ac": "REQ-012/AC-001",
+        "part": "full"
+      },
+      {
+        "ac": "REQ-012/AC-002",
+        "part": "full"
+      }
+    ],
+    "implements": [
+      "IF-002@1.1.0"
+    ],
+    "fixes": null,
+    "constraints": [
+      {
+        "id": "ADR-003/C-002",
+        "disposition": "conform",
+        "reason": "Clock reached only through the Clock seam."
+      }
+    ],
+    "untested_acs": [],
+    "not_unit_observable": null,
+    "characterization": [],
+    "dependencies": [],
+    "flags": []
+  },
+  "proposed_files": [
+    {
+      "path": "src/orders/cancel.py",
+      "op": "add",
+      "content": [
+        "\"\"\"Order cancellation.\"\"\"\n\nfrom orders.clock import Clock\n\n\ndef can_cancel(order, clock: Clock) -> bool:\n    # R-004: an order may be cancelled until it ships.\n    return order.shipped_at is None\n"
+      ]
+    },
+    {
+      "path": "tests/unit/orders/test_cancel.py",
+      "op": "add",
+      "content": [
+        "from orders.cancel import can_cancel\nfrom tests.fakes import FakeClock, make_order\n\n\n# cites: REQ-012/AC-001, R-004\ndef test_unshipped_order_can_be_ca",
+        "ncelled():\n    assert can_cancel(make_order(shipped_at=None), FakeClock()) is True\n\n\n# cites: REQ-012/AC-002, R-004\ndef test_shipped_order_cannot_be_cancelled():\n    assert can_cancel(make_order(shipped_at=\"2026-01-01T00:00:00Z\"), FakeClock()) is False\n"
+      ]
+    }
+  ],
+  "classification": {
+    "kind": "requirement_defect",
+    "defect": {
+      "target": "REQ-012/AC-004",
+      "expected": "Cancel allowed after shipping.",
+      "actual": "Cancel refused after shipping.",
+      "evidence_refs": [
+        "example/shop#31"
+      ]
+    },
+    "drafted": [],
+    "cites": [
+      "REQ-012/AC-004",
+      "R-004"
+    ],
+    "note": "The AC contradicts an active rule."
+  },
+  "defect_items": [
+    {
+      "target": "REQ-012/AC-004",
+      "kind": "contradicts",
+      "evidence_refs": [
+        "R-004",
+        "REQ-012/AC-004"
+      ],
+      "text": "AC-004 allows cancelling a shipped order; R-004 forbids it."
+    }
+  ],
+  "design_requests": [],
+  "questions": [
+    {
+      "id": "Q-001",
+      "key": {
+        "entity": "order",
+        "target_id": "cancel-order",
+        "attribute": "retry policy"
+      },
+      "blocks": [
+        "REQ-012/AC-005"
+      ],
+      "blocking": true,
+      "text": "Should a failed cancel be retried automatically?",
+      "options": [
+        {
+          "id": "a",
+          "text": "No retry."
+        },
+        {
+          "id": "b",
+          "text": "Retry once."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A-001",
+      "key": {
+        "entity": "order",
+        "target_id": null,
+        "attribute": "shipped state"
+      },
+      "text": "shipped_at is set when the carrier confirms pickup.",
+      "blocking": false
+    }
+  ],
+  "private_reports": [
+    {
+      "id": "SR-001",
+      "kind": "exposed_secret",
+      "location": "src/orders/config.py:3",
+      "text": "A credential-like literal; value withheld."
+    }
+  ],
+  "code_map": null,
+  "source_refs": [
+    "example/shop#31",
+    "knowledge/rules/orders/R-004.md"
+  ]
+}
