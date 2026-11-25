@@ -208,7 +208,8 @@ class MutationTest(unittest.TestCase):
 
 class PrepareAgentTest(unittest.TestCase):
     def test_build_prompt_signature(self):
-        self.assertEqual(list(inspect.signature(build_prompt).parameters), ["agent_path", "plugins_root"])
+        # The DevOps agents use the first two; later parameters (extra skills, contract) have defaults.
+        self.assertEqual(list(inspect.signature(build_prompt).parameters)[:2], ["agent_path", "plugins_root"])
 
     def test_agents_build_with_read_only_tools(self):
         for name, a in AGENTS.items():
