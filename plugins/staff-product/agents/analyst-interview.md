@@ -103,6 +103,8 @@ topic: T-01 · kind: readback · key: {entity: <e>, target_id: <id or null>, att
 Rules for the format:
 - Turns are numbered `T1`, `T2`, ... in order, with no gaps. Speakers are `human` or `interviewer`, nothing else (S-BA-056).
 - Every interviewer turn has its `topic` and `kind` line. A readback also has `key`, `value` and `from`, where `from` lists earlier human turns.
+- A wrap-up question that reviews several topics at once uses `topic: all · kind: question`. A readback always names a single topic ID.
 - Human turns are copied as typed, except for anything left out under the personal-data rule.
 - Each decision cites a confirmed readback pair `INT-n#T<k>/T<k+1>` or a human turn `INT-n#T<k>` (S-BA-056). Decisions and open items are an index. The Analyst cites the human turns, never your text (S-BA-057).
+- Coverage in Topics covered is exactly `covered`, `partial` or `not covered`.
 - Every topic that isn't `covered` appears in Open items with its topic ID. If nothing is open, write `- None.`.

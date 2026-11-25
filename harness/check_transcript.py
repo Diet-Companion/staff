@@ -23,6 +23,7 @@ SECTIONS = ("Topics covered", "Turns", "Decisions", "Open items", "Sources")
 CATEGORIES = {"actors", "goals", "journeys", "rules", "permissions", "quality_targets", "out_of_scope"}
 COVERAGE = {"covered", "partial", "not covered"}
 MAX_TOPICS = 10  # S-BA-055, starting value
+WRAP_UP_TOPIC = "all"  # a wrap-up question spanning several topics; never on a readback
 
 ID_RE = re.compile(r"^INT-[0-9]{3,}$")
 INTAKE_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+$")
@@ -168,7 +169,8 @@ def _turns(body, topics, problems):
                 problems.append(f"line {n}: interviewer turn T{k} lacks a valid topic/kind line (S-BA-055)")
             else:
                 turns[k][1] = meta
-                if meta.group("topic") not in topics:
+                wrap_up = meta.group("topic") == WRAP_UP_TOPIC and meta.group("kind") == "question"
+                if meta.group("topic") not in topics and not wrap_up:
                     problems.append(f"line {n}: turn T{k} topic is not in Topics covered")
                 if meta.group("kind") == "readback" and not meta.group("from"):
                     problems.append(f"line {n}: readback T{k} needs key, value and from (S-BA-055)")
