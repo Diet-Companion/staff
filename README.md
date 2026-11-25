@@ -55,6 +55,10 @@ staff/
     code_map.py                        # .staff/code.yml loader and path scope (S-DEV-004, -005)
     ready_gate.py                      # ready-gate (S-BA-017) and lifecycle (S-BA-009) check, no model
     run_record.py                      # run record (S-GEN-029)
+    append_run_log.py                  # outcome store: append and export entries (S-GEN-029, S-GEN-031)
+    log_review.py                      # /review comments -> verdict and review-minutes entries (S-GEN-032, S-GEN-071)
+    report.py                          # daily and weekly summary: runs, cost, review minutes, verdicts
+    schemas/run-log-entry.schema.json  # outcome-store entry schema
     contract.py                        # operators.yml, areas.yml, product.yml readers
     check_transcript.py                # INT-n transcript lint, run by the human before commit
     tests/                             # unittest; run by .github/workflows/harness-tests.yml
@@ -63,6 +67,7 @@ staff/
     product-contract.md                # what a product repo must contain
     operators.yml                      # the human's accounts, for actor checks
   docs/interview-kickoff.md            # operator how-to: run a kickoff interview, commit INT-n
+  docs/measurement.md                  # what is recorded, the outcome store, /review, the report, workflow snippets
   docs/strategy/                       # copy of the approved strategy and decisions log
   CODEOWNERS                           # the human owns every path
 ```
@@ -127,6 +132,8 @@ The full target layout (more plugins, `evals/`, `metrics/`, `ops/`, `experiments
    ```
 
    Then run `claude -p` from the base checkout with `--add-dir` for the input and head directories, validate with `validate_output.py --agent reviewer --input <input dir>/input.json`, and post `render_review.py`'s one comment and labels from a separate step that holds the reviewer App's token.
+
+6. Record runs and reviews in the outcome store and read the report: see [`docs/measurement.md`](docs/measurement.md).
 
 ## Changing this repo
 

@@ -2,7 +2,8 @@
 
 `--agent analyst` (the default), `--agent architect`, `--agent developer` or `--agent test-gen-api`. Keeps the issue title and
 body, comments by operators (governance/operators.yml, S-BA-015) and the agent
-App's own earlier comments. Drops every other comment.
+App's own earlier comments. Drops every other comment, the operator's run command, and
+`/review` review-log lines (log_review.py).
 All tracker text goes under `untrusted` and is marked as data, never
 instructions (S-SEC-001). Fails closed if the result exceeds --max-bytes.
 
@@ -38,6 +39,7 @@ AGENTS = {
 DEV_LABELS = {"dev:implement": "implement", "dev:fix": "fix", "dev:bootstrap": "bootstrap"}
 COMMENT_KINDS = {"operator": OPERATOR_KIND, "analyst_app": AGENTS["analyst"]["app_desc"]}
 COMMAND = AGENTS["analyst"]["command"]
+REVIEW_COMMAND = "/review"  # the human's review log (log_review.py), never intake content
 DEFAULT_MAX_BYTES = 100_000
 
 
@@ -56,8 +58,9 @@ def classify(comment, operators, bot_login, agent="analyst"):
     user = comment.get("user") or {}
     login, kind = str(user.get("login", "")), user.get("type")
     if kind == "User" and login.lower() in operators:
-        if (comment.get("body") or "").strip() == spec["command"]:
-            return None  # a run command, not intake content
+        body = (comment.get("body") or "").strip()
+        if body == spec["command"] or body.split("\n", 1)[0].split(" ", 1)[0] == REVIEW_COMMAND:
+            return None  # a run command or a review log line (log_review.py), not intake content
         return "operator"
     if kind == "Bot" and login == bot_login:
         return spec["app_kind"]

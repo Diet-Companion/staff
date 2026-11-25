@@ -40,6 +40,8 @@ REASONS = {
     "transcript_invalid",
     # write stage and bookkeeping
     "record_failed", "read_job_failed", "artifact_missing", "render_failed", "render_too_large",
+    # outcome store and review log (append_run_log.py, log_review.py, report.py)
+    "log_invalid", "log_store_failed", "review_invalid",
 }
 
 
