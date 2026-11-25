@@ -1,0 +1,72 @@
+# Test fixture: a copy of Diet-Companion/diet-companion .staff/code.yml at 1ebd8bc, the real code map.
+# Developer code map (S-DEV-004). Human-only file (S-GEN-025): DEV checks read it from the base branch.
+# Schema: staff plugins/staff-engineering/schemas/code-map.schema.json. Stack: ADR-007 (TypeScript end to
+# end), ADR-008 (spec-first, forward-only SQL migrations), ADR-009 (client/, backend/, label-reader/).
+version: 1
+areas:
+  system:   # all product code lives in the three packages of ADR-009, so the code area is `system`
+    source:
+      - package.json
+      - tsconfig.base.json
+      - client/**
+      - backend/**
+      - label-reader/**
+    unit_tests:
+      - client/src/**/*.test.ts
+      - client/src/**/*.test.tsx
+      - backend/src/**/*.test.ts
+      - label-reader/src/**/*.test.ts
+    generated:
+      - package-lock.json
+      - client/src/generated/**
+      - backend/src/generated/**
+    protected:                       # S-DEV-004: auth, secrets, permissions, data migrations
+      - backend/src/auth/**
+      - backend/src/config/**
+      - backend/migrations/**
+    dependency_files:
+      - package.json
+      - client/package.json
+      - backend/package.json
+      - label-reader/package.json
+    verification_config:
+      - vitest.config.ts
+      - vitest.workspace.ts
+      - "*/vitest.config.ts"
+      - eslint.config.js
+      - .prettierrc.json
+      - playwright.config.ts
+      - "*/tsconfig*.json"
+      - tsconfig.base.json
+    guard_patterns:
+      - stack: typescript
+        test_decl: ['\b(it|test)(\.each\([^)]*\))?\(\s*[''"`]']
+        assertion: ['\bexpect\(', '\bassert\.']
+        skip: ['\b(it|test|describe)\.(skip|todo)\(', '\bx(it|describe)\(']
+        expected_failure: ['\b(it|test)\.fails\(']
+        authorization: ['\brequireOwner\(']
+        validation: ['\b(validate|parse)[A-Z]\w*\(']
+        permission_deny: ['\breply\.code\(\s*40[13]\s*\)']
+        lint_suppression: ['eslint-disable', '@ts-ignore', '@ts-expect-error', '@ts-nocheck']
+        testability: ['data-testid=', '\brunId\b']
+    test_list:
+      - stack: typescript
+        command: npx vitest list --json
+    generators:
+      - generator_id: npm-lockfile
+        version: "1"
+        command: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+        inputs: [package.json, client/package.json, backend/package.json, label-reader/package.json]
+        outputs: [package-lock.json]
+    interface_source: none           # spec-first (ADR-008): the code implements IF-001's openapi.json
+    upkeep_tools: []
+    # Harness extension: what the stage-1 work sandbox runs (S-DEV-042). AGENTS.md defines the scripts.
+    sandbox:
+      setup: [npm ci --no-audit --no-fund]
+      build: [npm run typecheck, npm run build]
+      unit_test: npm test
+      unit_report: reports/unit.xml
+      # The database tests (*.int.test.ts) against DATABASE_URL, a throwaway PostgreSQL. The eval runner
+      # runs them; the stage-1 work sandbox doesn't yet.
+      integration_test: npm run test:integration
+      integration_report: reports/integration.xml

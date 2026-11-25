@@ -53,6 +53,7 @@ staff/
     render_developer.py                # Developer: one comment per draft change, with the sandbox result
     work_sandbox.py                    # Developer work sandbox: apply the proposed files, then build and test (S-DEV-042)
     code_map.py                        # .staff/code.yml loader and path scope (S-DEV-004, -005)
+    dev_diff_check.py                  # Developer code diff check: flags, blocks, operator sign-offs (S-DEV-018, -028), no model
     ready_gate.py                      # ready-gate (S-BA-017) and lifecycle (S-BA-009) check, no model
     run_record.py                      # run record (S-GEN-029)
     append_run_log.py                  # outcome store: append and export entries (S-GEN-029, S-GEN-031)
