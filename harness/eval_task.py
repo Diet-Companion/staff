@@ -14,7 +14,7 @@ Subcommands:
                commit the result as a fresh one-commit repo, so nothing in git hints at the task
                (S-GEN-040).
   event        Write the synthetic `issues: labeled` event and an empty comment list for build_input.py.
-  sandbox      Join the code map's build and unit commands and the API layer's test command into the
+  sandbox      Join the code map's build, unit and integration commands and the API layer's test command into the
                file eval_score.py runs (every command from the product's own .staff files, never the task).
 
 Nothing here prints task content: run logs of the private repo may be read by people who must stay blind.
@@ -157,10 +157,13 @@ def cmd_sandbox(args):
     api = (((read(args.tests_yml).get("areas") or {}).get(args.area) or {}).get(args.layer) or {}).get("sandbox")
     if not code or not api:
         raise HarnessError("input_invalid", "the code map or the test map has no sandbox block for the area")
-    write_json(args.out, {"version": 1, "setup": code["setup"], "build": code["build"],
-                          "unit": {"test": code["unit_test"], "report": code["unit_report"]},
-                          "api": {"test": api["test"], "report": api["report"]},
-                          "heldout_dir": HELDOUT_DIR})
+    out = {"version": 1, "setup": code["setup"], "build": code["build"],
+           "unit": {"test": code["unit_test"], "report": code["unit_report"]},
+           "api": {"test": api["test"], "report": api["report"]},
+           "heldout_dir": HELDOUT_DIR}
+    if code.get("integration_test"):
+        out["integration"] = {"test": code["integration_test"], "report": code["integration_report"]}
+    write_json(args.out, out)
     print("sandbox written")
 
 

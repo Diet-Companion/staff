@@ -47,10 +47,10 @@ def run_cmds(root, cmds, log):
     return all(sh(c, root, log) for c in cmds)
 
 
-def run_tests(root, sandbox, log, layers=("unit", "api")):
-    """{test_id: passed} over the given layers; a layer whose report is missing adds nothing."""
+def run_tests(root, sandbox, log, layers=("unit", "integration", "api")):
+    """{test_id: passed} over the given layers the sandbox has; a layer whose report is missing adds nothing."""
     results = {}
-    for layer in layers:
+    for layer in (x for x in layers if x in sandbox):
         report = os.path.join(root, sandbox[layer]["report"])
         if os.path.exists(report):
             os.remove(report)
