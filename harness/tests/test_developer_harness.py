@@ -1,4 +1,5 @@
 """The Developer's harness path: code map, readiness, input, prompt, output checks, sandbox, comments."""
+import base64
 import copy
 import json
 import os
@@ -513,6 +514,9 @@ class RenderTest(unittest.TestCase):
         long = copy.deepcopy(out["pr"])
         long["implements_acs"] = [{"ac": f"REQ-012/AC-{i:03d}", "part": "full"} for i in range(1, 20)]
         self.assertLessEqual(len(pr_title(long, 41)), 120)
+        marker = re.search(r"<!-- staff-pr-block:v1 ([A-Za-z0-9+/=]+) -->\n\Z", body)
+        self.assertIsNotNone(marker)
+        self.assertEqual(json.loads(base64.b64decode(marker.group(1))), out["pr"])
 
     def test_cli(self):
         d = tempfile.mkdtemp()

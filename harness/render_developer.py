@@ -27,6 +27,8 @@ CLI:
 Writes NN-*.md files to D in posting order, plus routing.json as render_architect.py does.
 """
 import argparse
+import base64
+import json
 import os
 
 import yaml
@@ -45,6 +47,9 @@ PR_NOTE = "Stage 2: the change is in {pr}. Review and merge it there; every PR g
 PR_MISSING_NOTE = ("Stage 2: the change passed the work sandbox, but publishing the PR failed. See the run's logs; "
                    "the patch artifact is attached to the run.")
 MAX_TITLE = 120
+# The validated PR block, machine-readable for the code diff check (S-DEV-018: not_unit_observable).
+# Base64, so no model text can close the HTML comment or render.
+PR_BLOCK_MARKER = "<!-- staff-pr-block:v1 {} -->"
 
 
 def outcome(data):
@@ -168,6 +173,11 @@ def render_main(data, meta, applied, sandbox, args):
     return "\n".join(out) + "\n"
 
 
+def pr_block_marker(pr):
+    raw = json.dumps(pr, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return PR_BLOCK_MARKER.format(base64.b64encode(raw).decode("ascii"))
+
+
 def stage_note(args, sandbox):
     """Where the change is: the patch artifact (stage 1) or the PR (stage 2, a passing sandbox only)."""
     if args.stage < 2:
@@ -194,7 +204,7 @@ def render_pr_body(data, meta, applied, sandbox, args):
     out += render_sandbox(sandbox, (meta.get("code_map_entry") or {}).get("sandbox"))
     if data["assumptions"]:
         out += ["#### Assumptions", ""] + [f"- **{esc(a['id'])}**: {esc(a['text'])}" for a in data["assumptions"]] + [""]
-    out += [f"Sources: {ids(data['source_refs'])}", "", footer(args)]
+    out += [f"Sources: {ids(data['source_refs'])}", "", footer(args), "", pr_block_marker(data["pr"])]
     return "\n".join(out) + "\n"
 
 
