@@ -62,6 +62,7 @@ class CheckTranscriptTest(unittest.TestCase):
             ("### T2 [human]", "### T2 human"): "not a turn marker",
             ("topic: T-01 · kind: question\n", ""): "lacks a valid topic/kind line",
             ("topic: T-02 · kind: question", "topic: T-09 · kind: question"): "topic is not in Topics covered",
+            ("topic: T-01 · kind: readback", "topic: all · kind: readback"): "topic is not in Topics covered",
             (" · key: {entity: refund, target_id: null, attribute: approver} · value: store admin · from: T2", ""):
                 "needs key, value and from",
             ("· from: T2", "· from: T1"): "cites T1, which is not an earlier human turn",
@@ -70,6 +71,10 @@ class CheckTranscriptTest(unittest.TestCase):
         for (old, new), expected in cases.items():
             with self.subTest(expected):
                 self.assertIn(expected, problems_for(old, new))
+
+    def test_wrap_up_question_may_span_topics(self):
+        # A summary question reviewing several topics (seen in the first live interview).
+        self.assertEqual(problems_for("topic: T-02 · kind: question", "topic: all · kind: question"), "")
 
     def test_decisions_cite_human_turns(self):
         cases = {
