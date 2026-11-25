@@ -5,7 +5,7 @@ import unittest
 from helpers import fixture, run_cli
 
 from common import HarnessError
-from contract import check_product, load_areas, load_operators
+from contract import check_product, effective_stage, load_areas, load_operators, load_stages
 
 
 def tmp_file(text):
@@ -41,6 +41,34 @@ class ContractTest(unittest.TestCase):
         with self.assertRaises(HarnessError):
             check_product(tmp_file("residency:\n  regions: []\nmodel_endpoint: anthropic-api\n"), "anthropic-api")
         check_product(tmp_file("residency:\n  regions:\n    - eu\nmodel_endpoint: anthropic-api\n"), "anthropic-api")
+
+    STAGES = "# human-only\nstages:\n  developer:\n    system: 2   # promoted 2026-11-25\n  analyst:\n    product: 1\n"
+
+    def test_stages_read_per_agent_and_area(self):
+        self.assertEqual(load_stages(tmp_file(self.STAGES)), {"developer": {"system": 2}, "analyst": {"product": 1}})
+        self.assertEqual(load_stages("/nonexistent/stages.yml"), {})
+        self.assertEqual(load_stages(tmp_file("stages:\n")), {})
+
+    def test_stages_fail_closed(self):
+        for text in ("stages:\n  developer:\n    system: 5\n", "stages:\n  developer:\n    system: two\n",
+                     "stages:\n  developer:\n    system: 2\n    system: 1\n", "stages:\n  Dev_X:\n    system: 2\n"):
+            with self.assertRaises(HarnessError):
+                load_stages(tmp_file(text))
+
+    def test_effective_stage_is_the_lowest(self):
+        path = tmp_file(self.STAGES)
+        self.assertEqual(effective_stage(path, "developer", "system"), 2)
+        self.assertEqual(effective_stage(path, "developer", "system", "1"), 1)  # a demotion ceiling
+        self.assertEqual(effective_stage(path, "developer", "system", "3"), 2)  # a ceiling never raises
+        self.assertEqual(effective_stage(path, "developer", "system", "junk"), 1)  # fails closed
+        self.assertEqual(effective_stage(path, "developer", "other-area"), 1)
+        self.assertEqual(effective_stage(path, "architect", "system"), 1)
+        self.assertEqual(effective_stage("/nonexistent/stages.yml", "developer", "system"), 1)
+
+    def test_stage_cli(self):
+        out = run_cli("contract.py", "stage", "--stages-yml", tmp_file(self.STAGES), "--agent", "developer",
+                      "--area", "system", "--ceiling", "")
+        self.assertEqual((out.returncode, out.stdout.strip()), (0, "2"))
 
     def test_is_operator_cli(self):
         ok = run_cli("contract.py", "is-operator", "--operators", fixture("operators.yml"), "--login", "Test-Operator")
