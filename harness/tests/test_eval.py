@@ -236,6 +236,22 @@ class ScoreTest(unittest.TestCase):
         self.assertEqual((r["status"], r["breaches"]), ("timeout", []))
 
 
+class ReleaseTest(unittest.TestCase):
+    def test_only_stray_items_are_released(self):
+        from eval_release import render, stray_items
+        t = task("trap", "0" * 40, trap=[{"target": "REQ-001/AC-002", "also": ["REQ-001/AC-003"], "kinds": ["contradicts"]}])
+        hit = {"target": "REQ-001/AC-003", "kind": "contradicts", "evidence_refs": ["a"], "text": "the other end"}
+        stray = {"target": "REQ-009/AC-001", "kind": "ambiguous", "evidence_refs": ["requirements/x/REQ-009.md"], "text": "unclear unit"}
+        design = {"target": "IF-001/getThing", "need": "interface", "evidence_refs": ["b"], "missing": "no operation"}
+        items = stray_items(t, {"defect_items": [hit, stray], "design_requests": [design]})
+        self.assertEqual([(i["type"], i["target"]) for i in items],
+                         [("defect_item", "REQ-009/AC-001"), ("design_request", "IF-001/getThing")])
+        page = render([{"task_kind": "trap", "items": items}])
+        self.assertIn("unclear unit", page)
+        self.assertNotIn("the other end", page)
+        self.assertNotIn("a1b2c3d4e5f6", page)           # no task ID
+
+
 def result(kind, **kw):
     r = {"kind": kind, "status": "completed", "cost_usd": 1.0, "heldout_passed": 0, "heldout_count": 0, "fixed": False,
          "regression_test": False, "traps_planted": 0, "traps_matched": 0, "escalations": 0, "false_escalations": 0,
