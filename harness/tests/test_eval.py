@@ -220,6 +220,15 @@ class ScoreTest(unittest.TestCase):
                       "--work", os.path.join(d, "w"), "--out", os.path.join(d, "r.json"))
         self.assertIn("artifact_missing", res.stderr)
 
+    def test_trap_with_other_fair_targets(self):
+        # A contradiction between AC-002 and AC-003: an item on either end matches, and neither is false.
+        t = task("trap", "", trap=[{"target": "REQ-001/AC-002", "also": ["REQ-001/AC-003"], "kinds": ["contradicts"]}])
+        ends = [{"target": f"REQ-001/AC-00{n}", "kind": "contradicts", "evidence_refs": ["x"], "text": "t"} for n in (2, 3)]
+        r = self.score(t, {"proposed_files": [], "defect_items": ends, "design_requests": []})
+        self.assertEqual((r["traps_matched"], r["escalations"], r["false_escalations"]), (1, 2, 0))
+        r = self.score(t, {"proposed_files": [], "defect_items": ends[1:], "design_requests": []})
+        self.assertEqual(r["traps_matched"], 1)                 # the other end alone finds the trap
+
     def test_failed_runs(self):
         r = self.score(task("feature", ""), record={"status": "crashed", "validation": {"ok": False, "reason": "schema_invalid"}})
         self.assertEqual((r["status"], r["breaches"], r["heldout_passed"]), ("crashed", ["invalid_output"], 0))
