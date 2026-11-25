@@ -1,0 +1,6 @@
+{
+  "name": "staff-meta",
+  "version": "0.1.0",
+  "description": "Cross-role meta agents (S-GEN-014): the seeding agent first (S-GEN-028, S-GEN-067). The strategy designer, improver and LLM judge come later.",
+  "dependencies": ["staff-core"]
+}
