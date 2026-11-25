@@ -20,7 +20,7 @@ import shutil
 from code_map import classify, matches
 from common import HarnessError, load_json, run_main, write_json
 from eval_task import HELDOUT_DIR, export_commit, fresh_repo, load_task, write_heldout, write_layer
-from work_sandbox import apply_files, changed_paths, junit_results, sh
+from work_sandbox import apply_files, changed_paths, code_map_entry, junit_results, sh
 
 # A run stopped by one of these produced output that failed a harness check: a hard-limit breach
 # ("schema-valid output; no write outside scope", S-DEV-036). Other stops (timeouts, caps, crashes) score zero.
@@ -101,8 +101,8 @@ def score(args):
     task = load_task(args.task, args.schema)
     record = load_json(args.run_record, "artifact_missing")
     sandbox = load_json(args.sandbox, "input_invalid")
-    entry = (load_json(args.meta, "artifact_missing").get("developer") or {}).get("code_map_entry") or {} \
-        if args.meta and os.path.exists(args.meta) else {}
+    # dev-meta.json holds the developer section at its top level; code_map_entry reads either shape.
+    entry = code_map_entry(args.meta) if args.meta and os.path.exists(args.meta) else {}
     reason = (record.get("validation") or {}).get("reason")
     validated = load_json(args.validated, "artifact_missing") if args.validated and os.path.exists(args.validated) else None
     ok = bool((record.get("validation") or {}).get("ok")) and validated is not None
@@ -121,6 +121,10 @@ def score(args):
         if result["reason"] in OUTPUT_REASONS:
             result["breaches"].append("invalid_output")
         return result
+    if not entry:
+        # A completed run always has dev-meta.json: without it, test and source paths would go unclassified
+        # and the regression-test and trap checks would silently pass or fail.
+        raise HarnessError("artifact_missing", "no code-map entry for a completed run")
     result["status"] = "completed"
     matched, raised, false = score_escalations(task, validated)
     result.update(traps_matched=matched, escalations=raised, false_escalations=false)

@@ -160,7 +160,7 @@ class ScoreTest(unittest.TestCase):
         args = ["--task", write(d, "task.json", t), "--product", product,
                 "--run-record", write(d, "rr.json", record or {"status": "completed", "validation": {"ok": True}, "cost_usd": 1.5}),
                 "--validated", write(d, "v.json", validated),
-                "--meta", write(d, "meta.json", {"developer": {"code_map_entry": ENTRY}}),
+                "--meta", write(d, "meta.json", {"area": "system", "code_map_entry": ENTRY}),   # dev-meta.json's real shape
                 "--sandbox", write(d, "sb.json", SANDBOX), "--work", os.path.join(d, "work"), "--out", os.path.join(d, "r.json")]
         res = run_cli("eval_score.py", *args)
         self.assertEqual(res.returncode, 0, res.stderr)
@@ -205,6 +205,16 @@ class ScoreTest(unittest.TestCase):
         r = self.score(task("trap", ""), {"proposed_files": [{"path": "backend/src/a.ts", "op": "add", "content": ["x"]}],
                                           "defect_items": [wrong_kind], "design_requests": []})
         self.assertEqual((r["traps_matched"], r["breaches"]), (0, ["code_for_trapped_ac"]))
+
+    def test_a_completed_run_needs_the_code_map(self):
+        d = tempfile.mkdtemp()
+        product, sha = product_repo({"impl.txt": "base\n"})
+        res = run_cli("eval_score.py", "--task", write(d, "t.json", task("trap", sha)), "--product", product,
+                      "--run-record", write(d, "rr.json", {"status": "completed", "validation": {"ok": True}}),
+                      "--validated", write(d, "v.json", {"proposed_files": []}),
+                      "--meta", write(d, "m.json", {"area": "system"}), "--sandbox", write(d, "sb.json", SANDBOX),
+                      "--work", os.path.join(d, "w"), "--out", os.path.join(d, "r.json"))
+        self.assertIn("artifact_missing", res.stderr)
 
     def test_failed_runs(self):
         r = self.score(task("feature", ""), record={"status": "crashed", "validation": {"ok": False, "reason": "schema_invalid"}})
