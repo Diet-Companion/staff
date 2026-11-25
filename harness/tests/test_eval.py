@@ -201,6 +201,10 @@ class ScoreTest(unittest.TestCase):
         other = {"target": "REQ-001/AC-003", "kind": "missing", "evidence_refs": ["x"], "text": "t"}
         r = self.score(task("trap", ""), {"proposed_files": [], "defect_items": [hit, other], "design_requests": []})
         self.assertEqual((r["traps_matched"], r["escalations"], r["false_escalations"], r["breaches"]), (1, 2, 1, []))
+        self.assertEqual(r["false_near_misses"], 1)              # REQ-001/AC-003: the trap's REQ, another AC
+        unrelated = {"target": "REQ-007/AC-001", "kind": "missing", "evidence_refs": ["x"], "text": "t"}
+        r = self.score(task("trap", ""), {"proposed_files": [], "defect_items": [hit, unrelated], "design_requests": []})
+        self.assertEqual((r["false_escalations"], r["false_near_misses"]), (1, 0))
         wrong_kind = dict(hit, kind="untestable")
         r = self.score(task("trap", ""), {"proposed_files": [{"path": "backend/src/a.ts", "op": "add", "content": ["x"]}],
                                           "defect_items": [wrong_kind], "design_requests": []})
@@ -245,6 +249,15 @@ class AggregateTest(unittest.TestCase):
         text = summary(agg)
         self.assertIn("**pass**", text)
         self.assertNotIn("task_id", json.dumps(agg))
+
+    def test_stray_escalation_breakdown(self):
+        rs = self.promotion()
+        rs[0] = result("feature", heldout_passed=4, heldout_count=5, escalations=1, false_escalations=1)
+        rs[8] = result("trap", traps_planted=1, traps_matched=1, escalations=2, false_escalations=1, false_near_misses=1)
+        agg = aggregate(rs, "s", "developer", "0" * 40, "m", rescore_of="123")
+        self.assertEqual(agg["false_escalations_by"], {"feature": 1, "fix": 0, "trap_near_miss": 1, "trap_unrelated": 0})
+        self.assertEqual((agg["escalations_raised"], agg["metrics"]["false_escalation_rate"]), (4, 0.5))
+        self.assertIn("re-score of run 123", summary(agg))
 
     def test_failing_sets(self):
         rs = self.promotion()
