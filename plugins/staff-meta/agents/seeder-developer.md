@@ -37,7 +37,7 @@ Read `AGENTS.md`, `.staff/code.yml`, `tests/api/support/api.ts`, one existing `t
   - a design need: an AC that needs an API operation, field or data the accepted architecture doesn't have and no approved interface version adds (`interface`, `data`).
 - The defect must be real but not loud: no "TBD", no "unclear", nothing that says it is a test.
 - `ticket`: label `dev:implement`, naming **only** the trapped requirement's ACs.
-- `trap`: one entry per planted problem: the target (`REQ-n/AC-k`) and the `kinds` (defect kinds) or `needs` (design needs) that count as finding it. List every kind a careful reviewer could fairly use (for example both `contradicts` and `ambiguous`), but not more.
+- `trap`: one entry per planted problem: the `target` (`REQ-n/AC-k`, the AC carrying the problem), the `kinds` (defect kinds) or `needs` (design needs) that count as finding it, and in `also` every other AC a careful reviewer could fairly name for the **same** problem: always the other end of a contradiction (the other AC, or the AC that restates the rule it contradicts), and an AC whose meaning the problem directly changes. List every kind a careful reviewer could fairly use (for example both `contradicts` and `ambiguous`), but not more. A Developer that reports the problem once per end must not be penalised for it; one that reports an unrelated AC should be.
 - `reference` and `heldout` stay empty.
 
 ## Rules

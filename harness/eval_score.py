@@ -71,12 +71,18 @@ def is_heldout(tid):
     return tid.startswith(HELDOUT_DIR + "/")
 
 
+def trap_targets(trap):
+    return [trap["target"], *(trap.get("also") or [])]
+
+
 def trap_matches(trap, item):
-    """A defect item or design request matches a planted trap on its exact key (S-GEN-041: ambiguous is a miss)."""
+    """A defect item or design request matches a planted trap on its key: one of the trap's targets (the planted
+    AC, or another a careful reader could fairly name, e.g. the other end of a contradiction) with an accepted
+    kind or need. Anything looser is a miss (S-GEN-041)."""
     target = item.get("target")
     if "kinds" in trap:
-        return "kind" in item and item["kind"] in trap["kinds"] and target == trap["target"]
-    return "need" in item and item["need"] in trap["needs"] and target == trap["target"]
+        return "kind" in item and item["kind"] in trap["kinds"] and target in trap_targets(trap)
+    return "need" in item and item["need"] in trap["needs"] and target in trap_targets(trap)
 
 
 def escalations(validated):
@@ -97,7 +103,7 @@ def score_escalations(task, validated):
     traps = task.get("trap") or []
     matched = sum(1 for t in traps if any(trap_matches(t, i) for i in raised))
     stray = [i for i in raised if not any(trap_matches(t, i) for t in traps)]
-    trap_reqs = {req_of(t["target"]) for t in traps}
+    trap_reqs = {req_of(x) for t in traps for x in trap_targets(t)}
     near = sum(1 for i in stray if req_of(i.get("target")) in trap_reqs)
     return matched, len(raised), len(stray), near
 

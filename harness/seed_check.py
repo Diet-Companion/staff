@@ -64,11 +64,10 @@ def check(args):
     if status != "ready":
         failures.append({"code": "not_ready", "blockers": details["blockers"][:10]})
     for trap in task.get("trap") or []:
-        rid = trap["target"].split("/")[0]
-        req = truth["reqs"].get(rid)
-        live = live_acs(req) if req else []
-        if req is None or ("/" in trap["target"] and trap["target"] not in live):
-            failures.append({"code": "trap_target_not_live", "target": trap["target"]})
+        for target in [trap["target"], *(trap.get("also") or [])]:
+            req = truth["reqs"].get(target.split("/")[0])
+            if req is None or ("/" in target and target not in live_acs(req)):
+                failures.append({"code": "trap_target_not_live", "target": target})
     if task["kind"] == "trap":
         return task, failures
 
