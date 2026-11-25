@@ -146,10 +146,17 @@ class TaskTest(unittest.TestCase):
         with open(out) as fh:
             s = json.load(fh)
         self.assertEqual((s["build"], s["unit"]["test"], s["api"]["report"]), (["b"], "c", "r/a.xml"))
+        self.assertNotIn("integration", s)
+        with open(os.path.join(d, "code.yml"), "a") as fh:
+            fh.write("      integration_test: e\n      integration_report: r/i.xml\n")
+        run_cli("eval_task.py", "sandbox", "--code-yml", os.path.join(d, "code.yml"),
+                "--tests-yml", os.path.join(d, "tests.yml"), "--out", out)
+        with open(out) as fh:
+            self.assertEqual(json.load(fh)["integration"], {"test": "e", "report": "r/i.xml"})
 
 
 class ScoreTest(unittest.TestCase):
-    def score(self, t, proposed=None, record=None, product_files=None):
+    def score(self, t, proposed=None, record=None, product_files=None, sandbox=SANDBOX):
         product, sha = product_repo(product_files or {"impl.txt": "base\n", "t.sh": RUNNER, "cases.txt": EXISTING})
         t = copy.deepcopy(t)
         t["base_sha"] = sha
@@ -161,7 +168,7 @@ class ScoreTest(unittest.TestCase):
                 "--run-record", write(d, "rr.json", record or {"status": "completed", "validation": {"ok": True}, "cost_usd": 1.5}),
                 "--validated", write(d, "v.json", validated),
                 "--meta", write(d, "meta.json", {"area": "system", "code_map_entry": ENTRY}),   # dev-meta.json's real shape
-                "--sandbox", write(d, "sb.json", SANDBOX), "--work", os.path.join(d, "work"), "--out", os.path.join(d, "r.json")]
+                "--sandbox", write(d, "sb.json", sandbox), "--work", os.path.join(d, "work"), "--out", os.path.join(d, "r.json")]
         res = run_cli("eval_score.py", *args)
         self.assertEqual(res.returncode, 0, res.stderr)
         self.assertNotIn("alpha", res.stdout + res.stderr)     # no task content in the log
@@ -193,9 +200,15 @@ class ScoreTest(unittest.TestCase):
         r = self.score(task("fix", ""), [{"path": "impl.txt", "op": "modify", "content": ["alpha\n"]}])
         self.assertEqual((r["fixed"], r["regression_test"], r["regression_miss"]), (True, False, "no_test_added"))
         # A test in a layer the sandbox doesn't run (here: not matched by the unit runner's glob).
-        r = self.score(task("fix", ""), [{"path": "impl.txt", "op": "modify", "content": ["alpha\n"]},
-                                         {"path": "backend/src/deep/fix.test.ts", "op": "add", "content": ["alpha"]}])
+        deep = [{"path": "impl.txt", "op": "modify", "content": ["alpha\n"]},
+                {"path": "backend/src/deep/fix.test.ts", "op": "add", "content": ["alpha"]}]
+        r = self.score(task("fix", ""), deep)
         self.assertEqual((r["regression_test"], r["regression_miss"]), (False, "tests_not_run"))
+        # With an integration layer that runs it, the same test counts.
+        integration = dict(SANDBOX, integration={"test": "sh t.sh 'backend/src/deep/*.test.ts' reports/int.xml",
+                                                 "report": "reports/int.xml"})
+        r = self.score(task("fix", ""), deep, sandbox=integration)
+        self.assertEqual((r["regression_test"], r["regression_miss"]), (True, None))
         # A test that doesn't catch the bug: it passes on the seeded version too.
         r = self.score(task("fix", ""), [{"path": "impl.txt", "op": "modify", "content": ["alpha\n"]},
                                          {"path": "backend/src/weak.test.ts", "op": "add", "content": ["\n"]}])

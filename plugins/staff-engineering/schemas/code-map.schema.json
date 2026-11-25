@@ -340,7 +340,23 @@
         "unit_report": {
           "$ref": "#/$defs/path",
           "description": "Where unit_test writes its JUnit XML report, relative to the repo root."
+        },
+        "integration_test": {
+          "$ref": "#/$defs/command",
+          "description": "Optional: runs the area's integration tests (DEV tests against a throwaway database, S-DEV-014) and writes a JUnit XML report to integration_report. Exit code ignored. Run by the eval runner; the stage-1 work sandbox doesn't run it yet."
+        },
+        "integration_report": {
+          "$ref": "#/$defs/path",
+          "description": "Where integration_test writes its JUnit report."
         }
+      },
+      "dependentRequired": {
+        "integration_test": [
+          "integration_report"
+        ],
+        "integration_report": [
+          "integration_test"
+        ]
       }
     },
     "short_text": {
