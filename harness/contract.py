@@ -1,6 +1,6 @@
 """Read the human-only contract files: governance/operators.yml (staff) and
-.staff/areas.yml and .staff/product.yml (product). Stdlib only, so the gate job
-needs no installs.
+.staff/areas.yml, .staff/product.yml and .staff/stages.yml (product). Stdlib only,
+so the gate job needs no installs.
 
 These readers accept only the simple shapes the contract defines
 (governance/product-contract.md) and fail closed on anything else.
@@ -8,14 +8,19 @@ These readers accept only the simple shapes the contract defines
 CLI:
   contract.py is-operator --operators F --login L      exit 0 if L is an operator
   contract.py check-product --product-yml F --endpoint E
+  contract.py stage --stages-yml F --agent A --area R [--ceiling N]
+                                                       print the effective stage (S-GEN-050)
 """
 import argparse
+import os
 import re
 
 from common import HarnessError, run_main
 
 LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 AREA_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+AGENT_RE = re.compile(r"^[a-z0-9][a-z0-9/-]{0,63}$")
+STAGES = (1, 2, 3, 4)
 
 
 def _lines(path):
@@ -98,6 +103,43 @@ def check_product(path, endpoint):
         raise HarnessError("contract_invalid", f"model_endpoint is not {endpoint} (S-DATA-002)")
 
 
+def load_stages(path):
+    """{agent: {area: stage}} from .staff/stages.yml (S-GEN-050). A missing file is empty."""
+    if not os.path.exists(path):
+        return {}
+    block = _block(path, "stages")
+    if not block:
+        return {}
+    stages, agent = {}, None
+    for indent, text in block:
+        if indent == block[0][0]:
+            m = re.fullmatch(r"([^:\s]+):", text)
+            if not m or not AGENT_RE.match(m.group(1)) or m.group(1) in stages:
+                raise HarnessError("contract_invalid", f"unexpected agent key in {path} stages")
+            agent = m.group(1)
+            stages[agent] = {}
+            continue
+        m = re.fullmatch(r"([^:\s]+):\s*([0-9]+)", text)
+        if agent is None or not m or not AREA_RE.match(m.group(1)) or int(m.group(2)) not in STAGES \
+                or m.group(1) in stages[agent]:
+            raise HarnessError("contract_invalid", f"unexpected stage line in {path}")
+        stages[agent][m.group(1)] = int(m.group(2))
+    return stages
+
+
+def effective_stage(path, agent, area, ceiling=""):
+    """The lowest of stages.yml and the demotion ceiling (S-GEN-050). Anything unset is stage 1.
+
+    The ceiling is a CI variable the ops stage job writes; empty means none. A value that
+    isn't a stage fails closed to 1, so a corrupted ceiling can never raise a stage.
+    """
+    stage = load_stages(path).get(agent, {}).get(area, 1)
+    if ceiling.strip():
+        cap = int(ceiling) if ceiling.strip().isdigit() else 1
+        stage = min(stage, cap if cap in STAGES else 1)
+    return stage
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -107,11 +149,18 @@ def main():
     pr = sub.add_parser("check-product")
     pr.add_argument("--product-yml", required=True)
     pr.add_argument("--endpoint", required=True)
+    st = sub.add_parser("stage")
+    st.add_argument("--stages-yml", required=True)
+    st.add_argument("--agent", required=True)
+    st.add_argument("--area", required=True)
+    st.add_argument("--ceiling", default="")
     args = ap.parse_args()
     if args.cmd == "is-operator":
         if args.login.lower() not in load_operators(args.operators):
             raise HarnessError("not_operator", "sender is not in governance/operators.yml")
         print("operator: yes")
+    elif args.cmd == "stage":
+        print(effective_stage(args.stages_yml, args.agent, args.area, args.ceiling))
     else:
         check_product(args.product_yml, args.endpoint)
         print("product contract: ok")
