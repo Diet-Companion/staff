@@ -14,7 +14,7 @@ from code_map import classify, glob_re, load_code_map
 from common import HarnessError
 from dev_bundle import bundle, load_truth, readiness
 from prepare_agent import build_prompt
-from render_developer import render
+from render_developer import pr_title, render, render_pr_body
 from run_record import role_fields
 from validate_output import check_developer, check_schema
 from work_sandbox import check_result, clean_line, junit_results
@@ -477,6 +477,43 @@ class RenderTest(unittest.TestCase):
         self.assertIn("REQ-013 is draft", main)
         self.assertIn("Classification", main)
 
+    def test_stage_2_comment_links_the_pr(self):
+        out = load("developer-feature.json")
+        passing = {"version": 1, "status": "pass", "build": {"base": True, "head": True}, "report": {"head": True},
+                   "tests": {"base_total": 3, "head_total": 4, "added": 1, "regressions": [], "flaky": [],
+                             "added_failing": [], "base_failing": []}}
+
+        class Stage2(Args):
+            stage, pr_number = 2, 57
+        main = dict(render(out, META, APPLIED, passing, Stage2, {})[0])["00-main.md"]
+        self.assertIn("### Developer (stage 2)", main)
+        self.assertIn("the change is in #57", main)
+        self.assertIn("Stage: 2 (proposing", main)
+        self.assertNotIn("Stage-1 draft", main)
+        Stage2.pr_number = None
+        main = dict(render(out, META, APPLIED, passing, Stage2, {})[0])["00-main.md"]
+        self.assertIn("publishing the PR failed", main)
+        failing = dict(passing, status="fail")
+        main = dict(render(out, META, APPLIED, failing, Stage2, {})[0])["00-main.md"]
+        self.assertIn("no PR, because the change didn't pass", main)
+
+    def test_pr_title_and_body(self):
+        out = load("developer-feature.json")
+        out["decision_summary"] = "@giokur see [x](http://e)"
+
+        class Stage2(Args):
+            stage, issue = 2, 41
+        title = pr_title(out["pr"], 41)
+        self.assertTrue(title.startswith("Developer #41: feature "), title)
+        self.assertNotIn("\n", title)
+        body = render_pr_body(out, META, APPLIED, None, Stage2)
+        self.assertLess(body.index("Decide first"), body.index("Proposed change"))
+        self.assertIn("Developer change for #41", body)
+        self.assertNotIn("@giokur", body)
+        long = copy.deepcopy(out["pr"])
+        long["implements_acs"] = [{"ac": f"REQ-012/AC-{i:03d}", "part": "full"} for i in range(1, 20)]
+        self.assertLessEqual(len(pr_title(long, 41)), 120)
+
     def test_cli(self):
         d = tempfile.mkdtemp()
         paths = {}
@@ -493,6 +530,13 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(res.returncode, 0, res.stderr)
         with open(os.path.join(d, "out", "00-failure.md")) as fh:
             self.assertTrue(re.match(r"Developer run 123-1 failed: `path_out_of_scope`", fh.read()))
+        res = run_cli("render_developer.py", "pr", "--in", paths["v"], "--meta", paths["m"], "--issue", "41",
+                      "--stage", "2", "--out-dir", os.path.join(d, "pr"), *footer)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        with open(os.path.join(d, "pr", "pr-title.txt")) as fh:
+            self.assertTrue(fh.read().startswith("Developer #41: "))
+        res = run_cli("render_developer.py", "pr", "--in", paths["v"], "--meta", paths["m"], "--out-dir", d, *footer)
+        self.assertEqual(res.returncode, 2)  # --issue is required for a PR
 
 
 class RunRecordTest(unittest.TestCase):
