@@ -64,11 +64,15 @@ def key_text(key):
     return f"{esc(key['entity'])} / {target} / {esc(key['attribute'])}"
 
 
+STAGE_LABELS = {1: "advisory: comments only", 2: "proposing: opens PRs, each fully reviewed"}
+
+
 def footer(args):
+    label = STAGE_LABELS.get(args.stage, STAGE_LABELS[1])
     return "\n".join([
         "---",
         f"Staff-Run-Id: {args.run_id}  ",
-        f"Stage: {args.stage} (advisory: comments only) · Model: {args.model} · Staff commit: {args.staff_sha}  ",
+        f"Stage: {args.stage} ({label}) · Model: {args.model} · Staff commit: {args.staff_sha}  ",
         f"Run: {args.run_url}" if args.run_url else "Run: n/a",
     ])
 

@@ -1,4 +1,4 @@
-"""Render validated Developer output into issue comments. No model involved.
+"""Render validated Developer output into issue comments and, at stage 2, the PR. No model involved.
 
 Deterministic: the same inputs and arguments give the same bytes. Stage-1 output is
 comments only (S-DEV-022):
@@ -10,6 +10,10 @@ comments only (S-DEV-022):
   --req-tickets names it (S-DEV-008), else on this ticket.
 Private reports are never rendered (S-DEV-019): the comment says only that some were withheld.
 
+At stage 2 (S-GEN-052) the harness pushes the change to an `agent/developer/*` branch and
+opens the PR: `pr` writes its title and body (the decision summary first, then the PR block,
+files and sandbox result), and the ticket comment links the PR instead of the patch note.
+
 Model text outside code blocks is escaped as in render_comment.py (S-SEC-002).
 
 CLI:
@@ -17,6 +21,9 @@ CLI:
                               [--applied applied.json] [--sandbox sandbox.json] [--req-tickets F]
                               [--patch-artifact NAME] <footer args>
   render_developer.py failure --reason CODE --out-dir D <footer args>
+  render_developer.py pr      --in validated.json --meta dev-meta.json --issue N --out-dir D
+                              [--applied applied.json] [--sandbox sandbox.json] <footer args>
+                              writes pr-title.txt and pr-body.md (stage 2)
 Writes NN-*.md files to D in posting order, plus routing.json as render_architect.py does.
 """
 import argparse
@@ -34,6 +41,10 @@ ANSWER_HINT = ("Answer in a comment as `Q-001: b` (or free text); then comment `
                "Choosing an option is your decision (S-DEV-001); the recommendation never applies by itself.")
 STAGE_NOTE = ("Stage-1 draft: nothing is committed (S-DEV-022). To take it, apply the patch artifact "
               "on a branch and open the PR yourself.")
+PR_NOTE = "Stage 2: the change is in {pr}. Review and merge it there; every PR gets your full review (S-GEN-052)."
+PR_MISSING_NOTE = ("Stage 2: the change passed the work sandbox, but publishing the PR failed. See the run's logs; "
+                   "the patch artifact is attached to the run.")
+MAX_TITLE = 120
 
 
 def outcome(data):
@@ -112,7 +123,7 @@ def render_sandbox(result, sandbox_cmds):
 
 def render_main(data, meta, applied, sandbox, args):
     r = meta["readiness"]
-    out = [f"### Developer (stage 1): {TITLES[outcome(data)]}", "",
+    out = [f"### Developer (stage {args.stage}): {TITLES[outcome(data)]}", "",
            f"Ticket kind: {esc(meta['ticket_kind'])} ({esc(meta['work'])}) · Area: {esc(meta['area'] or 'none')}"
            f" · Readiness: {esc(r['status'])}", "",
            "#### Decide first", "", quote(data["decision_summary"]), ""]
@@ -152,7 +163,37 @@ def render_main(data, meta, applied, sandbox, args):
                 + ", ".join(f"{esc(w['id'])} ({esc(w['kind'])})" for w in withheld)
                 + ". Re-run the ticket privately to read them.", ""]
     if data["pr"]:
-        out += [STAGE_NOTE, ""]
+        out += [stage_note(args, sandbox), ""]
+    out += [f"Sources: {ids(data['source_refs'])}", "", footer(args)]
+    return "\n".join(out) + "\n"
+
+
+def stage_note(args, sandbox):
+    """Where the change is: the patch artifact (stage 1) or the PR (stage 2, a passing sandbox only)."""
+    if args.stage < 2:
+        return STAGE_NOTE
+    if args.pr_number:
+        return PR_NOTE.format(pr=f"#{args.pr_number}")
+    if sandbox is not None and sandbox.get("status") == "pass":
+        return PR_MISSING_NOTE
+    return "Stage 2: no PR, because the change didn't pass the work sandbox (S-DEV-020)."
+
+
+def pr_title(pr, issue):
+    """Deterministic, from validated fields only: never tracker or model free text (S-SEC-002)."""
+    what = pr["fixes"]["target"] if pr["fixes"] else ", ".join(a["ac"] for a in pr["implements_acs"]) or pr["kind"]
+    title = f"Developer #{issue}: {pr['kind']} {what}"
+    return title if len(title) <= MAX_TITLE else title[:MAX_TITLE - 1] + "…"
+
+
+def render_pr_body(data, meta, applied, sandbox, args):
+    out = [f"Developer change for #{args.issue} (stage 2, S-GEN-052). Ticket kind: {esc(meta['ticket_kind'])}"
+           f" ({esc(meta['work'])}) · Area: {esc(meta['area'] or 'none')}", "",
+           "#### Decide first", "", quote(data["decision_summary"]), ""]
+    out += render_pr(data["pr"]) + render_files(applied, data["proposed_files"])
+    out += render_sandbox(sandbox, (meta.get("code_map_entry") or {}).get("sandbox"))
+    if data["assumptions"]:
+        out += ["#### Assumptions", ""] + [f"- **{esc(a['id'])}**: {esc(a['text'])}" for a in data["assumptions"]] + [""]
     out += [f"Sources: {ids(data['source_refs'])}", "", footer(args)]
     return "\n".join(out) + "\n"
 
@@ -187,7 +228,7 @@ def load_optional(path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("mode", choices=["render", "failure"])
+    ap.add_argument("mode", choices=["render", "failure", "pr"])
     ap.add_argument("--in", dest="path")
     ap.add_argument("--meta", help="dev-meta.json: the bundle's harness-made developer section")
     ap.add_argument("--applied", help="applied.json from work_sandbox.py apply")
@@ -195,6 +236,8 @@ def main():
     ap.add_argument("--req-tickets")
     ap.add_argument("--patch-artifact", default="")
     ap.add_argument("--reason")
+    ap.add_argument("--issue", type=int, help="pr: the ticket's issue number")
+    ap.add_argument("--pr-number", type=int, help="render, stage 2: the PR the change was pushed to")
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--run-url", default="")
@@ -205,6 +248,21 @@ def main():
     for name, rx in FOOTER_FORMATS.items():
         if getattr(args, name) and not rx.fullmatch(getattr(args, name)):
             raise HarnessError("render_failed", f"--{name.replace('_', '-')} has an unexpected format")
+    if args.mode == "pr":
+        data = load_json(args.path, "artifact_missing")
+        meta = load_json(args.meta, "artifact_missing")
+        if data.get("agent") != "developer" or not data.get("pr") or not args.issue:
+            raise HarnessError("render_failed", "pr needs Developer output with a PR block and --issue")
+        body = render_pr_body(data, meta, load_optional(args.applied), load_optional(args.sandbox), args)
+        if len(body) > MAX_COMMENT_CHARS:
+            raise HarnessError("render_too_large", f"pr-body.md has {len(body)} chars > {MAX_COMMENT_CHARS}")
+        os.makedirs(args.out_dir, exist_ok=True)
+        with open(os.path.join(args.out_dir, "pr-title.txt"), "w", encoding="utf-8") as fh:
+            fh.write(pr_title(data["pr"], args.issue) + "\n")
+        with open(os.path.join(args.out_dir, "pr-body.md"), "w", encoding="utf-8") as fh:
+            fh.write(body)
+        print("pr-title.txt\npr-body.md")
+        return
     if args.mode == "render":
         data = load_json(args.path, "artifact_missing")
         meta = load_json(args.meta, "artifact_missing")
