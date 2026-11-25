@@ -32,6 +32,8 @@ REASONS = {
     "code_map_invalid", "kind_mismatch", "ticket_mismatch", "not_ready", "path_out_of_scope", "flag_missing",
     "case_clash",
     "ac_not_ready", "sandbox_failed",
+    # code diff check (dev_diff_check.py)
+    "diff_failed",
     # test engineer (qa_bundle.py, test_map.py, validate_output.py --agent test-gen-api)
     "test_map_invalid", "citation_missing", "cite_invalid",
     # redaction of the output (redact_check.py, check_transcript.py)
