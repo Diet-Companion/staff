@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-engineering:ci-upkeep-output:1.0.0",
+  "title": "ci-upkeep read-stage output",
+  "description": "Structured output of the ci-upkeep read stage (S-DEVOPS-013). The staff-core harness validates it and rejects any action outside the allowed set (S-SEC-002, S-SEC-003). Free-text fields are quoted data, at most 2,000 characters each (S-SEC-002). The pr block follows the delivery-PR contract with kind upkeep (S-DEVOPS-009); pins follow S-DEVOPS-049. files[] is harness-derived from the workspace diff, never model output (S-DEVOPS-013, S-DEV-021).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "trigger",
+    "outcome",
+    "decision_summary",
+    "pin_groups",
+    "tool_runs",
+    "handoffs",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "ci-upkeep"
+    },
+    "trigger": {
+      "description": "What started this run (S-DEVOPS-006).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {
+          "description": "weekly: the weekly run on new pin-report items. dispatch: an operator dispatched devops:upkeep with a target. review: an operator reviewed the draft or PR.",
+          "enum": ["weekly", "dispatch", "review"]
+        },
+        "ref": { "$ref": "#/$defs/ref" },
+        "target": {
+          "description": "The dispatch target, for kind dispatch.",
+          "$ref": "#/$defs/ref"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "dispatch" } } },
+          "then": { "required": ["target"] }
+        }
+      ]
+    },
+    "outcome": {
+      "description": "upkeep: pin and cache-key changes. upkeep_and_handoffs: both. handoffs: only draft DevOps tickets for changes beyond pins. no_change: a clean no-op (S-DEVOPS-053). blocked: the delivery map or a prerequisite is missing (S-DEVOPS-004, S-DEVOPS-052).",
+      "enum": ["upkeep", "upkeep_and_handoffs", "handoffs", "no_change", "blocked"]
+    },
+    "decision_summary": {
+      "description": "Required, first in every comment or PR body (S-DEVOPS-015): pins with their sign-off refs or 'needs sign-off', flags, advisories, hand-offs; then prose.",
+      "$ref": "#/$defs/text"
+    },
+    "pr": { "$ref": "#/$defs/pr" },
+    "files": {
+      "description": "Harness-derived from the workspace diff (S-DEVOPS-013, S-DEV-021). The model never writes it.",
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "pin_groups": {
+      "description": "Pin groups, one stage-1 comment each, so each group gets its own verdict (S-DEVOPS-014). Every pin in pr.pins is in exactly one group. At most 10 per run.",
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/pin_group" }
+    },
+    "tool_runs": {
+      "description": "Runs of the delivery map's pin_tool and other declared tools (S-DEVOPS-013).",
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tool_id", "version", "paths"],
+        "properties": {
+          "tool_id": { "$ref": "#/$defs/short_text" },
+          "version": { "$ref": "#/$defs/short_text" },
+          "paths": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/path" }
+          }
+        }
+      }
+    },
+    "handoffs": {
+      "description": "Draft DevOps tickets for needed changes beyond pin and cache-key lines (S-DEVOPS-005). At most 7 per run.",
+      "type": "array",
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "text", "paths", "source_refs"],
+        "properties": {
+          "title": { "$ref": "#/$defs/short_text" },
+          "text": { "$ref": "#/$defs/text" },
+          "paths": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/path" }
+          },
+          "source_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/ref" }
+          }
+        }
+      }
+    },
+    "blocked": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "detail"],
+      "properties": {
+        "reason": { "enum": ["no_delivery_entry", "delivery_map_overlap", "prerequisite_missing", "unworkable_input"] },
+        "detail": { "$ref": "#/$defs/text" }
+      }
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites: pin-report items, index entries, release notes, files.",
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/ref" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "enum": ["upkeep", "upkeep_and_handoffs"] } } },
+      "then": {
+        "required": ["pr"],
+        "properties": { "pin_groups": { "minItems": 1 } }
+      },
+      "else": {
+        "not": { "required": ["pr"] },
+        "properties": { "pin_groups": { "maxItems": 0 } }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "enum": ["upkeep_and_handoffs", "handoffs"] } } },
+      "then": { "properties": { "handoffs": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "enum": ["upkeep", "no_change", "blocked"] } } },
+      "then": { "properties": { "handoffs": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "enum": ["no_change", "blocked"] } } },
+      "then": { "properties": { "tool_runs": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "blocked" } } },
+      "then": { "required": ["blocked"] },
+      "else": { "not": { "required": ["blocked"] } }
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "ref": {
+      "description": "A source ref: ticket, comment, pin-report item, index entry, release note, check output or file path.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "environment": {
+      "enum": ["ephemeral", "staging-equivalent", "production"]
+    },
+    "digest": {
+      "description": "A content digest (algorithm:value) or a full commit SHA, never a tag (S-SEC-009, S-DEVOPS-042).",
+      "type": "string",
+      "pattern": "^([a-z0-9]+:[A-Za-z0-9+/=_.-]{16,256}|[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "pin": {
+      "description": "One pin change (S-DEVOPS-009, S-DEVOPS-049). A propagation cites the approved-pin index sign-off in signoff_ref; a bump to a new version has signoff_ref null and needs a sign-off (S-SEC-009). Upkeep only replaces existing references, so from is never null.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "from", "to", "signoff_ref"],
+      "properties": {
+        "name": { "$ref": "#/$defs/short_text" },
+        "from": { "$ref": "#/$defs/short_text" },
+        "to": { "$ref": "#/$defs/digest" },
+        "signoff_ref": {
+          "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }]
+        }
+      }
+    },
+    "flag": {
+      "description": "A flag the checks will raise, with its flag ID from (check, element), here (name, to-digest) (S-DEVOPS-046).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flag_id", "reason"],
+      "properties": {
+        "flag_id": { "$ref": "#/$defs/short_text" },
+        "reason": { "$ref": "#/$defs/text" }
+      }
+    },
+    "pr": {
+      "description": "The delivery-PR block with kind upkeep (S-DEVOPS-009).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ticket", "cites", "environments", "plan_refs", "pins", "flags"],
+      "properties": {
+        "kind": { "const": "upkeep" },
+        "ticket": { "$ref": "#/$defs/ref" },
+        "cites": {
+          "description": "QAS, CMP, ADR or IF IDs, rarely needed for upkeep.",
+          "type": "array",
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(QAS-[0-9]{3,}|CMP-[0-9]{3,}|ADR-[0-9]{3,}(/C-[0-9]{3,})?|IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+)$"
+          }
+        },
+        "environments": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/environment" }
+        },
+        "plan_refs": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "pins": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/pin" }
+        },
+        "flags": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/flag" }
+        }
+      }
+    },
+    "pin_group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group_id", "summary", "pins", "cache_key_paths"],
+      "properties": {
+        "group_id": { "type": "string", "pattern": "^G-[0-9]{2,}$" },
+        "summary": { "$ref": "#/$defs/text" },
+        "pins": {
+          "description": "Names of pins in pr.pins that belong to this group.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/short_text" }
+        },
+        "cache_key_paths": {
+          "description": "Files whose cache keys this group fixes.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/path" }
+        }
+      },
+      "anyOf": [
+        { "properties": { "pins": { "minItems": 1 } } },
+        { "properties": { "cache_key_paths": { "minItems": 1 } } }
+      ]
+    },
+    "file": {
+      "description": "One changed file, harness-derived (S-DEV-021): full content in ordered chunks of at most 2,000 characters.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "op", "from", "content"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "op": { "enum": ["add", "modify", "delete", "rename"] },
+        "from": {
+          "anyOf": [{ "$ref": "#/$defs/path" }, { "type": "null" }]
+        },
+        "content": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2000 }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "op": { "const": "rename" } } },
+          "then": { "properties": { "from": { "$ref": "#/$defs/path" } } }
+        }
+      ]
+    }
+  }
+}

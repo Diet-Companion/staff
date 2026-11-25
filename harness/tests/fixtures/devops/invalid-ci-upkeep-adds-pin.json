@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "ci-upkeep",
+  "trigger": {
+    "kind": "weekly",
+    "ref": "check:pin-report/weekly"
+  },
+  "outcome": "upkeep_and_handoffs",
+  "decision_summary": "Pins: example/base-image propagated to an index digest (sign-off example/shop#30 comment 2); example/runner bumped to a new version (needs sign-off). Flags: 1. Hand-off: 1.\nTwo pin groups, one comment each.",
+  "pr": {
+    "kind": "upkeep",
+    "ticket": "example/shop#60",
+    "cites": [],
+    "environments": [],
+    "plan_refs": [],
+    "pins": [
+      {
+        "name": "example/base-image",
+        "from": null,
+        "to": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "signoff_ref": "example/shop#30 comment 2"
+      },
+      {
+        "name": "example/runner",
+        "from": "v1.2.0@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "to": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "signoff_ref": null
+      }
+    ],
+    "flags": [
+      {
+        "flag_id": "pin/example/runner/sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "reason": "New version; needs sign-off (S-SEC-009)."
+      }
+    ]
+  },
+  "pin_groups": [
+    {
+      "group_id": "G-01",
+      "summary": "Base image propagation.",
+      "pins": [
+        "example/base-image"
+      ],
+      "cache_key_paths": []
+    },
+    {
+      "group_id": "G-02",
+      "summary": "Runner image bump.",
+      "pins": [
+        "example/runner"
+      ],
+      "cache_key_paths": [
+        ".github/workflows/ci.yml"
+      ]
+    }
+  ],
+  "tool_runs": [
+    {
+      "tool_id": "pin_tool",
+      "version": "1.0.0",
+      "paths": [
+        "Dockerfile",
+        ".github/workflows/ci.yml"
+      ]
+    }
+  ],
+  "handoffs": [
+    {
+      "title": "Example IaC provider major version needs input changes",
+      "text": "The new provider version renames an input; that is beyond a pin line.",
+      "paths": [
+        "infra/main.tf"
+      ],
+      "source_refs": [
+        "check:pin-report/weekly"
+      ]
+    }
+  ],
+  "source_refs": [
+    "check:pin-report/weekly",
+    "index:approved-pins"
+  ]
+}

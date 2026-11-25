@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "devops",
+  "trigger": {
+    "kind": "bootstrap",
+    "ref": "dispatch:devops-bootstrap/1",
+    "fixup_round": 0
+  },
+  "outcome": "bootstrap",
+  "decision_summary": "Decide first: the fork and the exports list are yours to set. Draft delivery map for one IaC stack and one deploy unit.",
+  "design_requests": [],
+  "defect_items": [],
+  "questions": [],
+  "assumptions": [
+    {
+      "id": "A-001",
+      "key": {
+        "entity": "delivery map",
+        "target_id": null,
+        "attribute": "fork"
+      },
+      "text": "Fork left null for the human to register.",
+      "blocking": false
+    }
+  ],
+  "private_reports": [],
+  "source_refs": [
+    ".staff/areas.yml",
+    "architecture/web/components/CMP-003.md"
+  ],
+  "delivery_map": {
+    "pipelines": [
+      ".github/workflows/ci.yml",
+      ".github/actions/**"
+    ],
+    "build": [
+      "Dockerfile"
+    ],
+    "iac": {
+      "main": {
+        "paths": [
+          "infra/**"
+        ],
+        "tool": "example-iac",
+        "validate": "example-iac validate",
+        "plan": "example-iac plan",
+        "parser": "example-iac-json",
+        "environments": [
+          "ephemeral",
+          "staging-equivalent",
+          "production"
+        ]
+      }
+    },
+    "environments": {
+      "ephemeral": {
+        "stack": "main",
+        "data_source": "synthetic",
+        "seams": {
+          "flags": true,
+          "clock": true,
+          "fakes": true
+        },
+        "run_id_correlation": true
+      },
+      "staging-equivalent": {
+        "stack": "main",
+        "data_source": "synthetic",
+        "seams": {
+          "flags": true,
+          "clock": false,
+          "fakes": false
+        },
+        "run_id_correlation": true
+      },
+      "production": {
+        "stack": "main",
+        "data_source": "production",
+        "seams": {
+          "flags": false,
+          "clock": true,
+          "fakes": false
+        },
+        "run_id_correlation": true
+      }
+    },
+    "deploy_units": {
+      "web": [
+        "CMP-003"
+      ]
+    },
+    "migrations": {
+      "main": "make migrate"
+    },
+    "monitors": {
+      "format": null,
+      "command": null
+    },
+    "load": {
+      "tool": null,
+      "command": null
+    },
+    "pin_tool": "make pin",
+    "fork": null,
+    "exports": []
+  }
+}

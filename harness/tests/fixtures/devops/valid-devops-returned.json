@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "devops",
+  "trigger": {
+    "kind": "arch_change",
+    "ref": "example/shop@main",
+    "fixup_round": 0
+  },
+  "outcome": "returned",
+  "decision_summary": "Decide first: design request on QAS-007 (measure not observable). One private report filed. No draft.",
+  "design_requests": [
+    {
+      "target": "QAS-007",
+      "need": "testability",
+      "missing": "No monitor or load run can observe the measure: the response is not exposed by any metric.",
+      "evidence_refs": [
+        "architecture/web/quality/QAS-007.md"
+      ]
+    }
+  ],
+  "defect_items": [],
+  "questions": [],
+  "assumptions": [],
+  "private_reports": [
+    {
+      "id": "PRIV-001",
+      "kind": "exposed_secret",
+      "location": "delivery/environments/ephemeral/values.yml line 12",
+      "summary": "A value that looks like a credential is committed at this location."
+    }
+  ],
+  "source_refs": [
+    "architecture/web/quality/QAS-007.md"
+  ]
+}

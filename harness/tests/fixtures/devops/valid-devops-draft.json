@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "devops",
+  "trigger": {
+    "kind": "change_label",
+    "ref": "example/shop#41",
+    "fixup_round": 0
+  },
+  "outcome": "draft",
+  "decision_summary": "Cited: CMP-003, ADR-002/C-001. Flags: 1 (new action pin needs sign-off). Permissions, egress, secrets, environment bindings: no net change. Pins: actions/example-cache to aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (needs sign-off). Plan: ephemeral stack 2 add, 0 change, 0 destroy. Environments: ephemeral.\nAdds a dependency cache step to the PR build job of the web unit.",
+  "pr": {
+    "kind": "pipeline",
+    "ticket": "example/shop#41",
+    "cites": [
+      "CMP-003",
+      "ADR-002/C-001"
+    ],
+    "environments": [
+      "ephemeral"
+    ],
+    "plan_refs": [
+      "ci-artifact:plan-ephemeral"
+    ],
+    "pins": [
+      {
+        "name": "actions/example-cache",
+        "from": null,
+        "to": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signoff_ref": null
+      }
+    ],
+    "flags": [
+      {
+        "flag_id": "pipeline/ci.yml/build/new-dependency",
+        "reason": "New action pinned by digest; needs a devops:dependency sign-off (S-SEC-009)."
+      }
+    ]
+  },
+  "design_requests": [],
+  "defect_items": [],
+  "questions": [],
+  "assumptions": [],
+  "private_reports": [],
+  "source_refs": [
+    "example/shop#41",
+    ".staff/delivery.yml",
+    "architecture/web/components/CMP-003.md"
+  ]
+}

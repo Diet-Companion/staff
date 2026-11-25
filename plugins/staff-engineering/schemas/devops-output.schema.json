@@ -1,0 +1,562 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:staff:staff-engineering:devops-output:1.0.0",
+  "title": "DevOps read-stage output",
+  "description": "Structured output of the DevOps read stage (S-DEVOPS-013). The staff-core harness validates it and rejects any action outside the allowed set (S-SEC-002, S-SEC-003). Free-text fields are quoted data, at most 2,000 characters each (S-SEC-002). The pr block follows the delivery-PR contract (S-DEVOPS-009); design requests follow S-DEV-008, defect items S-BA-048, questions S-BA-014. files[] is harness-derived from the workspace diff, never model output (S-DEVOPS-013, S-DEV-021).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "trigger",
+    "outcome",
+    "decision_summary",
+    "design_requests",
+    "defect_items",
+    "questions",
+    "assumptions",
+    "private_reports",
+    "source_refs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "agent": {
+      "const": "devops"
+    },
+    "trigger": {
+      "description": "What started this run (S-DEVOPS-006).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "fixup_round"],
+      "properties": {
+        "kind": {
+          "description": "change_label: an operator applied devops:change. arch_change: the post-merge delivery check saw a merged ARCH change. delivery_gap: the nightly delivery check found a gap. infra_item: an operator ticked an infrastructure item (S-DEVOPS-033). answer, review: an operator answered or reviewed. check_failure: a required check failed on its own PR. bootstrap: an operator dispatched devops:bootstrap.",
+          "enum": ["change_label", "arch_change", "delivery_gap", "infra_item", "answer", "review", "check_failure", "bootstrap"]
+        },
+        "ref": { "$ref": "#/$defs/ref" },
+        "fixup_round": {
+          "description": "Fix-up run number on the PR, 1 to 3 for check_failure (starting value, S-DEVOPS-006); 0 otherwise.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "check_failure" } } },
+          "then": { "properties": { "fixup_round": { "minimum": 1 } } },
+          "else": { "properties": { "fixup_round": { "const": 0 } } }
+        }
+      ]
+    },
+    "outcome": {
+      "description": "draft: one PR-sized change. draft_and_questions: a draft with open questions. returned: problems sent back only (S-DEVOPS-008). bootstrap: a draft delivery-map entry (S-DEVOPS-004, devops:bootstrap only). blocked: the run can't proceed (missing or overlapping map, missing prerequisite, unworkable input).",
+      "enum": ["draft", "draft_and_questions", "returned", "bootstrap", "blocked"]
+    },
+    "decision_summary": {
+      "description": "Required, first in every comment or PR body (S-DEVOPS-015): cited IDs; flagged diffs; net changes to permissions, egress, secrets and environment bindings; pins with their sign-off refs; plan summary per stack; environments touched; then prose.",
+      "$ref": "#/$defs/text"
+    },
+    "pr": { "$ref": "#/$defs/pr" },
+    "files": {
+      "description": "Harness-derived from the workspace diff (S-DEVOPS-013, S-DEV-021). The model never writes it.",
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "design_requests": {
+      "description": "Design requests in the S-DEV-008 form, with need deployment or testability (S-DEVOPS-008). At most 7 per run.",
+      "type": "array",
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/design_request" }
+    },
+    "defect_items": {
+      "description": "Requirement-defect items (S-BA-048). At most 7 per run.",
+      "type": "array",
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/defect_item" }
+    },
+    "questions": {
+      "description": "Questions in the S-BA-014 form: at most 7, blocking first, each with 2 to 4 options and a recommended one. A request that would weaken an S-SEC-006 or S-SEC-007 control is a question, never a draft (S-DEVOPS-008).",
+      "type": "array",
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/question" }
+    },
+    "assumptions": {
+      "description": "Open assumptions recorded in this run, including overflow questions. At most 20.",
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/assumption" }
+    },
+    "private_reports": {
+      "description": "Suspected vulnerabilities or exposed secrets, filed privately by the write stage (S-SEC-011). By location, never by value. At most 5.",
+      "type": "array",
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/private_report" }
+    },
+    "delivery_map": {
+      "description": "Draft .staff/delivery.yml entry for the human to commit (S-DEVOPS-004). devops:bootstrap only (S-DEVOPS-006).",
+      "$ref": "#/$defs/delivery_map"
+    },
+    "blocked": {
+      "description": "Why the run stopped (S-DEVOPS-004, S-DEVOPS-052).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "detail"],
+      "properties": {
+        "reason": { "enum": ["no_delivery_entry", "delivery_map_overlap", "prerequisite_missing", "unworkable_input"] },
+        "detail": { "$ref": "#/$defs/text" }
+      }
+    },
+    "source_refs": {
+      "description": "Every source the run read and cites.",
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/ref" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "enum": ["draft", "draft_and_questions"] } } },
+      "then": { "required": ["pr"] },
+      "else": { "not": { "required": ["pr"] } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "draft_and_questions" } } },
+      "then": { "properties": { "questions": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "returned" } } },
+      "then": {
+        "anyOf": [
+          { "properties": { "design_requests": { "minItems": 1 } } },
+          { "properties": { "defect_items": { "minItems": 1 } } },
+          { "properties": { "questions": { "minItems": 1 } } },
+          { "properties": { "private_reports": { "minItems": 1 } } }
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "bootstrap" } } },
+      "then": {
+        "required": ["delivery_map"],
+        "properties": { "trigger": { "properties": { "kind": { "const": "bootstrap" } } } }
+      },
+      "else": { "not": { "required": ["delivery_map"] } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "blocked" } } },
+      "then": { "required": ["blocked"] },
+      "else": { "not": { "required": ["blocked"] } }
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "short_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "ref": {
+      "description": "A source ref: ticket, comment, check output, plan, file path, or a QAS, CMP, ADR, IF, REQ or AC ID.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "glob": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "stack": {
+      "description": "An IaC stack key in the delivery map.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+    },
+    "environment": {
+      "enum": ["ephemeral", "staging-equivalent", "production"]
+    },
+    "arch_id": {
+      "description": "QAS-n, CMP-n, ADR-n, ADR-n/C-k or an interface version IF-n@x.y.z (S-ARCH-005).",
+      "type": "string",
+      "pattern": "^(QAS-[0-9]{3,}|CMP-[0-9]{3,}|ADR-[0-9]{3,}(/C-[0-9]{3,})?|IF-[0-9]{3,}@[0-9]+\\.[0-9]+\\.[0-9]+)$"
+    },
+    "any_req_id": { "type": "string", "pattern": "^REQ-[0-9]{3,}(/AC-[0-9]{3,})?$" },
+    "cmp_id": { "type": "string", "pattern": "^CMP-[0-9]{3,}$" },
+    "question_id": { "type": "string", "pattern": "^Q-[0-9]{3,}$" },
+    "assumption_id": { "type": "string", "pattern": "^A-[0-9]{3,}$" },
+    "digest": {
+      "description": "A content digest (algorithm:value) or a full commit SHA, never a tag (S-SEC-009, S-DEVOPS-042).",
+      "type": "string",
+      "pattern": "^([a-z0-9]+:[A-Za-z0-9+/=_.-]{16,256}|[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "key": {
+      "description": "What a question or assumption is about (S-BA-007 form).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "target_id", "attribute"],
+      "properties": {
+        "entity": { "$ref": "#/$defs/short_text" },
+        "target_id": {
+          "type": ["string", "null"],
+          "maxLength": 200
+        },
+        "attribute": { "$ref": "#/$defs/short_text" }
+      }
+    },
+    "pin": {
+      "description": "One pin change (S-DEVOPS-009). signoff_ref is the approved-pin index sign-off for a propagation, or null for a new version that needs a sign-off (S-DEVOPS-049, S-SEC-009).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "from", "to", "signoff_ref"],
+      "properties": {
+        "name": { "$ref": "#/$defs/short_text" },
+        "from": {
+          "description": "The current reference, or null for a newly added dependency.",
+          "anyOf": [{ "$ref": "#/$defs/short_text" }, { "type": "null" }]
+        },
+        "to": { "$ref": "#/$defs/digest" },
+        "signoff_ref": {
+          "anyOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }]
+        }
+      }
+    },
+    "flag": {
+      "description": "A flag the checks will raise, with its flag ID from (check, element) (S-DEVOPS-046). Each needs an operator sign-off.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flag_id", "reason"],
+      "properties": {
+        "flag_id": { "$ref": "#/$defs/short_text" },
+        "reason": { "$ref": "#/$defs/text" }
+      }
+    },
+    "pr": {
+      "description": "The delivery-PR block (S-DEVOPS-009). One ticket, base main, at most 500 changed lines (checked by the contract check on the harness-derived diff).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ticket", "cites", "environments", "plan_refs", "pins", "flags"],
+      "properties": {
+        "kind": {
+          "description": "ci-upkeep alone uses upkeep.",
+          "enum": ["pipeline", "iac", "environment", "monitor", "load"]
+        },
+        "ticket": { "$ref": "#/$defs/ref" },
+        "cites": {
+          "type": "array",
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/arch_id" }
+        },
+        "environments": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/environment" }
+        },
+        "plan_refs": {
+          "description": "Refs to the test-environment plans (S-DEVOPS-037).",
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "pins": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/pin" }
+        },
+        "flags": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/flag" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "enum": ["monitor", "load"] } } },
+          "then": {
+            "properties": {
+              "cites": { "contains": { "type": "string", "pattern": "^QAS-[0-9]{3,}$" } }
+            }
+          }
+        }
+      ]
+    },
+    "file": {
+      "description": "One changed file, harness-derived (S-DEV-021): full content in ordered chunks of at most 2,000 characters.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "op", "from", "content"],
+      "properties": {
+        "path": { "$ref": "#/$defs/glob" },
+        "op": { "enum": ["add", "modify", "delete", "rename"] },
+        "from": {
+          "anyOf": [{ "$ref": "#/$defs/glob" }, { "type": "null" }]
+        },
+        "content": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 2000 }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "op": { "const": "rename" } } },
+          "then": { "properties": { "from": { "$ref": "#/$defs/glob" } } }
+        }
+      ]
+    },
+    "design_request": {
+      "description": "S-DEV-008 form. need is deployment or testability for DEVOPS (S-DEVOPS-008).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "need", "missing", "evidence_refs"],
+      "properties": {
+        "target": {
+          "description": "The QAS, component, ADR constraint, interface element or deploy unit the request is about.",
+          "$ref": "#/$defs/ref"
+        },
+        "need": { "enum": ["deployment", "testability"] },
+        "missing": { "$ref": "#/$defs/text" },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ref" }
+        }
+      }
+    },
+    "defect_item": {
+      "description": "Requirement-defect item (S-BA-048).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "kind", "evidence_refs"],
+      "properties": {
+        "target": { "$ref": "#/$defs/any_req_id" },
+        "kind": { "enum": ["ambiguous", "contradicts", "untestable", "missing", "infeasible"] },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ref" }
+        }
+      }
+    },
+    "question": {
+      "description": "One question in the S-BA-014 form.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "blocks", "blocking", "text", "options", "recommended", "priority"],
+      "properties": {
+        "id": { "$ref": "#/$defs/question_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "blocks": {
+          "description": "The ticket, QAS, component, environment or file the question blocks.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ref" }
+        },
+        "blocking": { "type": "boolean" },
+        "text": { "$ref": "#/$defs/text" },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "text"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-d]$" },
+              "text": { "$ref": "#/$defs/text" }
+            }
+          }
+        },
+        "recommended": {
+          "description": "Shown to the human; never applied without an answer (S-BA-015).",
+          "type": "string",
+          "pattern": "^[a-d]$"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      }
+    },
+    "assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "text", "blocking"],
+      "properties": {
+        "id": { "$ref": "#/$defs/assumption_id" },
+        "key": { "$ref": "#/$defs/key" },
+        "text": { "$ref": "#/$defs/text" },
+        "blocking": { "type": "boolean" }
+      }
+    },
+    "private_report": {
+      "description": "A private report (S-SEC-011). location names where, never the value.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "location", "summary"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^PRIV-[0-9]{3,}$" },
+        "kind": { "enum": ["suspected_vulnerability", "exposed_secret"] },
+        "location": { "$ref": "#/$defs/ref" },
+        "summary": { "$ref": "#/$defs/text" }
+      }
+    },
+    "seams": {
+      "description": "S-TESTAB-008 control seams (S-DEVOPS-041).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flags", "clock", "fakes"],
+      "properties": {
+        "flags": { "type": "boolean" },
+        "clock": { "type": "boolean" },
+        "fakes": { "type": "boolean" }
+      }
+    },
+    "delivery_environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stack", "data_source", "seams", "run_id_correlation"],
+      "properties": {
+        "stack": {
+          "anyOf": [{ "$ref": "#/$defs/stack" }, { "type": "null" }]
+        },
+        "data_source": { "enum": ["synthetic", "production"] },
+        "seams": { "$ref": "#/$defs/seams" },
+        "run_id_correlation": {
+          "description": "run_id correlation and readiness wired (S-TESTAB-007, S-DEVOPS-041).",
+          "type": "boolean"
+        }
+      }
+    },
+    "delivery_map": {
+      "description": "Keys of .staff/delivery.yml (S-DEVOPS-004). Unknown values are null or empty and recorded as open assumptions.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pipelines", "build", "iac", "environments", "deploy_units", "migrations", "monitors", "load", "pin_tool", "fork", "exports"],
+      "properties": {
+        "pipelines": {
+          "description": "Product CI/CD workflow and composite-action globs. Never staff-* workflows.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 300, "not": { "pattern": "(^|/)staff-[^/]*$" } }
+        },
+        "build": { "type": "array", "items": { "$ref": "#/$defs/glob" } },
+        "iac": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/stack" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["paths", "tool", "validate", "plan", "parser", "environments"],
+            "properties": {
+              "paths": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/glob" } },
+              "tool": { "$ref": "#/$defs/short_text" },
+              "validate": { "$ref": "#/$defs/command" },
+              "plan": { "$ref": "#/$defs/command" },
+              "parser": { "$ref": "#/$defs/short_text" },
+              "environments": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "$ref": "#/$defs/environment" }
+              }
+            }
+          }
+        },
+        "environments": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ephemeral", "staging-equivalent", "production"],
+          "properties": {
+            "ephemeral": {
+              "allOf": [
+                { "$ref": "#/$defs/delivery_environment" },
+                { "properties": { "data_source": { "const": "synthetic" } } }
+              ]
+            },
+            "staging-equivalent": {
+              "allOf": [
+                { "$ref": "#/$defs/delivery_environment" },
+                { "properties": { "data_source": { "const": "synthetic" } } }
+              ]
+            },
+            "production": {
+              "description": "Seams off in production (S-DEVOPS-041).",
+              "allOf": [
+                { "$ref": "#/$defs/delivery_environment" },
+                {
+                  "properties": {
+                    "seams": {
+                      "properties": {
+                        "flags": { "const": false },
+                        "clock": { "const": false },
+                        "fakes": { "const": false }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "deploy_units": {
+          "description": "Deploy unit name to the CMP IDs whose deployment.unit it carries (S-ARCH-007).",
+          "type": "object",
+          "propertyNames": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/cmp_id" }
+          }
+        },
+        "migrations": {
+          "description": "Migration command per stack (S-DEVOPS-038).",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/stack" },
+          "additionalProperties": { "$ref": "#/$defs/command" }
+        },
+        "monitors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["format", "command"],
+          "properties": {
+            "format": { "anyOf": [{ "$ref": "#/$defs/short_text" }, { "type": "null" }] },
+            "command": { "anyOf": [{ "$ref": "#/$defs/command" }, { "type": "null" }] }
+          }
+        },
+        "load": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tool", "command"],
+          "properties": {
+            "tool": { "anyOf": [{ "$ref": "#/$defs/short_text" }, { "type": "null" }] },
+            "command": { "anyOf": [{ "$ref": "#/$defs/command" }, { "type": "null" }] }
+          }
+        },
+        "pin_tool": { "anyOf": [{ "$ref": "#/$defs/command" }, { "type": "null" }] },
+        "fork": {
+          "description": "The registered DEVOPS fork (S-DEVOPS-019). The human registers it; a draft leaves it null.",
+          "anyOf": [{ "$ref": "#/$defs/short_text" }, { "type": "null" }]
+        },
+        "exports": {
+          "description": "Production-derived sources the export job may read (S-DEVOPS-029). Human-decided.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/short_text" }
+        }
+      }
+    }
+  }
+}

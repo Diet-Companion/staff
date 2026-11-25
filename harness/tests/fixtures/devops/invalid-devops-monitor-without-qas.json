@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "agent": "devops",
+  "trigger": {
+    "kind": "delivery_gap",
+    "ref": "check:delivery/nightly",
+    "fixup_round": 0
+  },
+  "outcome": "draft_and_questions",
+  "decision_summary": "Decide first: Q-001 (alert channel). Cited: QAS-004. Flags: none. Environments: production.\nAdds the production monitor for QAS-004 with the threshold equal to its measure (p95 under 300 ms).",
+  "pr": {
+    "kind": "monitor",
+    "ticket": "example/shop#52",
+    "cites": [
+      "CMP-003"
+    ],
+    "environments": [
+      "production"
+    ],
+    "plan_refs": [],
+    "pins": [],
+    "flags": []
+  },
+  "design_requests": [],
+  "defect_items": [],
+  "questions": [
+    {
+      "id": "Q-001",
+      "key": {
+        "entity": "monitor",
+        "target_id": "QAS-004",
+        "attribute": "alert channel"
+      },
+      "blocks": [
+        "QAS-004"
+      ],
+      "blocking": true,
+      "text": "Which channel should the QAS-004 alert page?",
+      "options": [
+        {
+          "id": "a",
+          "text": "The on-call channel."
+        },
+        {
+          "id": "b",
+          "text": "Email only."
+        }
+      ],
+      "recommended": "a",
+      "priority": 1
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A-001",
+      "key": {
+        "entity": "monitor",
+        "target_id": "QAS-004",
+        "attribute": "evaluation window"
+      },
+      "text": "A 5-minute window; QAS-004 names none.",
+      "blocking": false
+    }
+  ],
+  "private_reports": [],
+  "source_refs": [
+    "check:delivery/nightly",
+    "architecture/web/quality/QAS-004.md"
+  ]
+}
