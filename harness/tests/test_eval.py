@@ -187,10 +187,19 @@ class ScoreTest(unittest.TestCase):
         r = self.score(task("fix", ""), [{"path": "impl.txt", "op": "modify", "content": ["alpha\n"]},
                                          {"path": "backend/src/fix.test.ts", "op": "add", "content": ["alpha"]}])
         self.assertEqual((r["fixed"], r["regression_test"], r["bug_encoding"], r["breaches"]), (True, True, 0, []))
+        self.assertIsNone(r["regression_miss"])
 
     def test_fix_without_a_test_and_with_a_bug_encoding_test(self):
         r = self.score(task("fix", ""), [{"path": "impl.txt", "op": "modify", "content": ["alpha\n"]}])
-        self.assertEqual((r["fixed"], r["regression_test"]), (True, False))
+        self.assertEqual((r["fixed"], r["regression_test"], r["regression_miss"]), (True, False, "no_test_added"))
+        # A test in a layer the sandbox doesn't run (here: not matched by the unit runner's glob).
+        r = self.score(task("fix", ""), [{"path": "impl.txt", "op": "modify", "content": ["alpha\n"]},
+                                         {"path": "backend/src/deep/fix.test.ts", "op": "add", "content": ["alpha"]}])
+        self.assertEqual((r["regression_test"], r["regression_miss"]), (False, "tests_not_run"))
+        # A test that doesn't catch the bug: it passes on the seeded version too.
+        r = self.score(task("fix", ""), [{"path": "impl.txt", "op": "modify", "content": ["alpha\n"]},
+                                         {"path": "backend/src/weak.test.ts", "op": "add", "content": ["\n"]}])
+        self.assertEqual(r["regression_miss"], "passes_on_seeded")
         # The agent "fixes" by encoding the bug: its test passes on the seeded version, fails on the correction.
         r = self.score(task("fix", ""), [{"path": "backend/src/bug.test.ts", "op": "add", "content": ["broken"]}])
         self.assertEqual((r["fixed"], r["regression_test"], r["bug_encoding"]), (False, False, 1))
