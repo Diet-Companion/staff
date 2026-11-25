@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Diet-Companion/staff/plugins/staff-meta/schemas/seeder-developer-output.schema.json",
+  "title": "Seeding agent output: one Developer eval task (S-GEN-067, S-DEV-036)",
+  "description": "The harness adds the opaque id, set, base commit and provenance, and checks the task in a sandbox before storing it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent",
+    "kind",
+    "summary",
+    "ticket",
+    "overlay",
+    "reference",
+    "heldout",
+    "trap"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "agent": {
+      "const": "seeder-developer"
+    },
+    "kind": {
+      "enum": [
+        "feature",
+        "fix",
+        "trap"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+    },
+    "ticket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "title",
+        "body"
+      ],
+      "properties": {
+        "label": {
+          "enum": [
+            "dev:implement",
+            "dev:fix"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        }
+      }
+    },
+    "overlay": {
+      "$ref": "#/$defs/files"
+    },
+    "reference": {
+      "$ref": "#/$defs/files"
+    },
+    "heldout": {
+      "type": "array",
+      "maxItems": 6,
+      "description": "API-layer test files placed in tests/api/heldout/ at scoring time: the acceptance tests (feature) or the symptom check (fix). Empty for a trap.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "content"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,60}\\.api\\.test\\.ts$"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60000
+          }
+        }
+      }
+    },
+    "trap": {
+      "type": "array",
+      "maxItems": 4,
+      "description": "The planted defects (S-DEV-036): keyed (AC ID, defect kind) or (AC ID, need).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "pattern": "^REQ-[0-9]{3,}(/AC-[0-9]{3,})?$"
+          },
+          "kinds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "ambiguous",
+                "contradicts",
+                "untestable",
+                "missing",
+                "infeasible"
+              ]
+            }
+          },
+          "needs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "interface",
+                "element",
+                "dependency",
+                "data",
+                "technology",
+                "testability"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "affected",
+        "symptom"
+      ],
+      "description": "The catalogue entry of a fix task's seeded bug (S-GEN-039).",
+      "properties": {
+        "category": {
+          "enum": [
+            "boundary",
+            "missing_check",
+            "wrong_value",
+            "wrong_branch",
+            "state",
+            "error_mapping"
+          ]
+        },
+        "affected": {
+          "type": "string",
+          "pattern": "^(REQ-[0-9]{3,}/AC-[0-9]{3,}|R-[0-9]{3,}|ADR-[0-9]{3,}/[A-Za-z0-9-]+)$"
+        },
+        "symptom": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    }
+  },
+  "$defs": {
+    "files": {
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "content"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(^|/)\\.\\.?(/|$))[A-Za-z0-9._/-]{1,200}$"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 200000
+          }
+        }
+      }
+    }
+  }
+}

@@ -178,8 +178,26 @@ TEST_GEN_CONTRACT = """\
   (S-SEC-003).
 """
 
+SEEDER_CONTRACT = """\
+# Harness contract (staff harness, seeding run)
+
+- **Input (the seeding request).** The JSON file named in the user message. Read it first
+  with the Read tool. `kind` and `slot` say what to write; `existing` lists the tickets of
+  the set's other tasks; `previous`, when present, is your last attempt at this slot and
+  the validity check's refusal: `failures` (fixed codes), and for test failures the test
+  IDs and their first message line. Fix exactly what was refused, and return the whole
+  task again.
+- **Repo.** Your working directory is the product repo at the pinned commit, read-only.
+- **Nothing runs here.** After validation, the harness builds and tests your task in a job
+  with no secrets (S-GEN-067) and stores it in the private eval repo only if it passes.
+- **No secret-like strings.** The output is redaction-checked and dropped whole on a hit
+  (S-SEC-004).
+- **Output.** Return your one JSON object by calling the StructuredOutput tool exactly
+  once. Write nothing else.
+"""
+
 CONTRACTS = {"analyst": ANALYST_CONTRACT, "reviewer": REVIEWER_CONTRACT, "architect": ARCHITECT_CONTRACT,
-             "developer": DEVELOPER_CONTRACT, "test-gen": TEST_GEN_CONTRACT}
+             "developer": DEVELOPER_CONTRACT, "test-gen": TEST_GEN_CONTRACT, "seeder": SEEDER_CONTRACT}
 
 
 def split_front_matter(path):
