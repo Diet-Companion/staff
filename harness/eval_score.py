@@ -83,13 +83,23 @@ def escalations(validated):
     return list(validated.get("defect_items") or []) + list(validated.get("design_requests") or [])
 
 
+def req_of(target):
+    return target.split("/", 1)[0] if isinstance(target, str) and target.startswith("REQ-") else None
+
+
 def score_escalations(task, validated):
-    """(planted traps matched, escalations raised, escalations matching no planted trap)."""
+    """(planted traps matched, escalations raised, escalations matching no planted trap, of those the near misses).
+
+    A near miss names the requirement of a planted trap but not its exact key (another AC, kind or need): a
+    diagnostic only, never a match (S-GEN-041). It lets a blind reader tell a seeding-spec gap from an overreach.
+    """
     raised = escalations(validated)
     traps = task.get("trap") or []
     matched = sum(1 for t in traps if any(trap_matches(t, i) for i in raised))
-    false = sum(1 for i in raised if not any(trap_matches(t, i) for t in traps))
-    return matched, len(raised), false
+    stray = [i for i in raised if not any(trap_matches(t, i) for t in traps)]
+    trap_reqs = {req_of(t["target"]) for t in traps}
+    near = sum(1 for i in stray if req_of(i.get("target")) in trap_reqs)
+    return matched, len(raised), len(stray), near
 
 
 def test_files(proposed, entry):
@@ -114,7 +124,7 @@ def score(args):
         "heldout_count": task.get("heldout_count", 0), "heldout_passed": 0,
         "fixed": False, "regression_test": False, "bug_encoding": 0,
         "traps_planted": len(task.get("trap") or []), "traps_matched": 0,
-        "escalations": 0, "false_escalations": 0,
+        "escalations": 0, "false_escalations": 0, "false_near_misses": 0,
         "suite_green": None, "breaches": [],
     }
     if not ok:
@@ -126,8 +136,8 @@ def score(args):
         # and the regression-test and trap checks would silently pass or fail.
         raise HarnessError("artifact_missing", "no code-map entry for a completed run")
     result["status"] = "completed"
-    matched, raised, false = score_escalations(task, validated)
-    result.update(traps_matched=matched, escalations=raised, false_escalations=false)
+    matched, raised, false, near = score_escalations(task, validated)
+    result.update(traps_matched=matched, escalations=raised, false_escalations=false, false_near_misses=near)
     proposed = validated.get("proposed_files") or []
     if kind == "trap":
         # "No code for a trapped AC": a trap ticket names only trapped ACs, so any source change is code for one.
