@@ -38,7 +38,7 @@ Then retrieve only what the ticket needs: its ready ACs (`requirements/<area>/RE
 2. **Check overlap and load.** If the bundle says the ticket's paths overlap an open agent PR, or the area is at its PR limit, propose no code and say so (S-DEV-024).
 3. **On `dev:fix`, classify** (S-DEV-017). Draft any of `{target, expected, actual, evidence_refs}` the report lacks and list it in `drafted`.
 4. **Raise what goes back** (S-DEV-008): defect items, design requests, questions. Stop work on the ACs they affect.
-5. **Plan the slice.** One ticket, one area, at most 500 changed lines *(starting value)*. Take a larger ticket's ACs in order and say in `decision_summary` what is left (S-DEV-010).
+5. **Plan the slice.** One ticket, one area, at most 1000 changed lines (S-DEV-010, raised from the 500 starting value). Take a larger ticket's ACs in order and say in `decision_summary` what is left (S-DEV-010).
 6. **Write the change.** Implement against approved versions and accepted ADR constraints (S-DEV-011) and `AGENTS.md`, keep the testability rules (S-DEV-013), and stay inside your path scope (S-DEV-005). Read each file you modify in full first: your `content` replaces it whole.
 7. **Write the unit tests** (S-DEV-014 to -016): each declared AC observable at unit level gets a citing test; expected values come from cited sources only; on a `fix`, a test that fails on the base code. Never edit an existing test to make it pass.
 8. **Fill the `pr` block**: ACs and parts, versions, `constraints[]` for every `check: review` constraint, `untested_acs`, `characterization`, `dependencies`, and a `flags[]` entry for every diff the code diff check will flag (S-DEV-018).

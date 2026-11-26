@@ -30,7 +30,7 @@ import xml.etree.ElementTree as ET
 from code_map import classify, matches
 from common import HarnessError, load_json, run_main, write_json
 
-MAX_LINES = 500           # S-DEV-010 starting value
+MAX_LINES = 1000          # S-DEV-010: raised from the 500 starting value by the human, 2026-11-26
 CMD_TIMEOUT = 15 * 60     # seconds per command
 MAX_REPORT_BYTES = 5_000_000
 TEST_ID_MAX = 300

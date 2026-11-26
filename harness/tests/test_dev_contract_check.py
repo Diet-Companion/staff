@@ -151,14 +151,19 @@ class TicketAndSizeTest(ContractCase):
         result = self.check(block=self.block(ticket=f"{REPO}#8"))
         self.assertEqual(self.failures(result, "ticket"), [f"the block's ticket is {REPO}#8, the branch names {REPO}#7"])
 
-    def test_over_500_lines_fails(self):
-        big = "".join(f"export const v{i} = {i};\n" for i in range(497))
+    def test_over_1000_lines_fails(self):
+        big = "".join(f"export const v{i} = {i};\n" for i in range(996))
         result = self.check({TEST_PATH: CITING_TEST, "backend/src/big.ts": big})
-        self.assertEqual(result["lines_changed"], 502)
+        self.assertEqual(result["lines_changed"], 1001)
         self.assertEqual(len(self.failures(result, "size")), 1)
 
+    def test_1000_lines_pass(self):
+        big = "".join(f"export const v{i} = {i};\n" for i in range(995))
+        result = self.check({TEST_PATH: CITING_TEST, "backend/src/big.ts": big})
+        self.assertTrue(result["passed"], result["failures"])
+
     def test_generated_lines_are_not_counted(self):
-        lock = "".join(f'"p{i}": 1,\n' for i in range(900))
+        lock = "".join(f'"p{i}": 1,\n' for i in range(1500))
         result = self.check({TEST_PATH: CITING_TEST, "package-lock.json": lock})
         self.assertTrue(result["passed"], result["failures"])
         self.assertEqual(result["lines_changed"], 5)
