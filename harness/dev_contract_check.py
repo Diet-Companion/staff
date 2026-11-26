@@ -9,7 +9,7 @@ can't loosen what it is checked against. A PR fails when:
     characters, S-SEC-002);
   - ticket, area: the block's ticket isn't the one the branch names, or the diff touches more than one
     code-map area (S-GEN-060);
-  - size: more than 500 changed lines (starting value), not counting `generated` paths, which hold
+  - size: more than 1000 changed lines (human decision 2026-11-26; starting value 500), not counting `generated` paths, which hold
     the lockfile (S-DEV-030). Split a larger ticket into several PRs in AC order;
   - declared: a declared AC isn't a live AC of a ready requirement, its requirement's quality targets
     have no accepted QAS, or a declared interface version isn't approved or deprecated (S-DEV-007).
@@ -56,7 +56,7 @@ from validate_output import CITE_RE
 STAFF = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCHEMAS = os.path.join(STAFF, "plugins", "staff-engineering", "schemas")
 MARKER = "<!-- staff-dev-contract-check:v1 -->"
-MAX_LINES = 500  # S-DEV-010 starting value
+MAX_LINES = 1000  # S-DEV-010: raised from the 500 starting value by the human, 2026-11-26
 BLOCK_RE = re.compile(r"<!-- staff-pr-block:v1 ([A-Za-z0-9+/=]*) -->")
 SUMMARY_RE = re.compile(r"\A[^\n]*\n\s*#### Decide first\n\s*\n> \S")
 BRANCH_RE = re.compile(r"^agent/(developer|dev-upkeep)/(.+)$")
