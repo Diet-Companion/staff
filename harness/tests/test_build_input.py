@@ -64,6 +64,11 @@ class BuildInputTest(unittest.TestCase):
         self.assertIn("input_too_large", proc.stderr)
         self.assertFalse(os.path.exists(out))
 
+    def test_architect_has_a_larger_default_cap(self):
+        from build_input import DEFAULT_MAX_BYTES, MAX_BYTES_BY_AGENT
+        self.assertGreater(MAX_BYTES_BY_AGENT["architect"], DEFAULT_MAX_BYTES)
+        self.assertNotIn("developer", MAX_BYTES_BY_AGENT)
+
 
 if __name__ == "__main__":
     unittest.main()
