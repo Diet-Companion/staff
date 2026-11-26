@@ -11,7 +11,7 @@ from helpers import FIXTURES, STAFF, run_cli
 from build_input import build
 from common import HarnessError
 from prepare_agent import build_prompt, cli_schema
-from render_architect import fenced, render, req_tickets
+from render_architect import MAX_COMMENT_CHARS, fenced, render, req_tickets
 from run_record import role_fields
 from validate_output import architecture_truth, check_architect, check_schema
 
@@ -321,6 +321,18 @@ class RenderTest(unittest.TestCase):
                     "architecture/billing/interfaces/IF-009/1.0.0.yaml", ".github/workflows/x.yml"):
             with self.subTest(bad):
                 self.assertEqual(spec_path(bad), fallback)
+
+    def test_a_spec_too_long_for_a_comment_is_named_not_inlined(self):
+        doc = load("architect-design.json")
+        doc["spec_versions"][0]["document"] += "\n" + "x" * 70_000
+        files = dict(render(doc, Args, {})[0])
+        body = next(b for n, b in files.items() if "IF-003" in n)
+        self.assertLessEqual(len(body), MAX_COMMENT_CHARS)
+        self.assertNotIn("x" * 1000, body)
+        self.assertIn(f"architect-run-{Args.run_id}", body)
+        self.assertIn("Proposed spec <code>", body)
+        short = dict(render(load("architect-design.json"), Args, {})[0])
+        self.assertIn("<details><summary>Proposed spec", next(b for n, b in short.items() if "IF-003" in n))
 
     def test_req_tickets(self):
         d = tempfile.mkdtemp()
