@@ -424,6 +424,14 @@ def check_developer(out, expect, base_dir=None):
     if (kind == "fix") != (out["classification"] is not None):
         raise HarnessError("kind_mismatch", "/classification is set exactly on dev:fix tickets (S-DEV-017)")
     if pr is None:
+        # A ready ticket with a scope gets code, or a reason someone can act on (S-DEV-008). A run
+        # that proposes nothing and raises nothing is a silent no-op, not an answer. PR rounds may
+        # decline a review point in the summary, and a classified fix may need no code.
+        raised = out["questions"] or out["defect_items"] or out["design_requests"]
+        if (readiness.get("status") == "ready" and entry is not None and kind in ("implement", "fix")
+                and out["classification"] is None and not dev.get("round") and not raised):
+            raise HarnessError("no_output", "a ready ticket got no code and no question, defect item or "
+                               "design request")
         return
     if readiness.get("status") != "ready" or entry is None:
         raise HarnessError("not_ready", "code is proposed for a ticket that is not ready or has no code-map entry")
