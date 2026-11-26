@@ -191,8 +191,8 @@ def stage_note(args, sandbox):
 
 def pr_title(pr, issue):
     """Deterministic, from validated fields only: never tracker or model free text (S-SEC-002)."""
-    what = pr["fixes"]["target"] if pr["fixes"] else ", ".join(a["ac"] for a in pr["implements_acs"]) or pr["kind"]
-    title = f"Developer #{issue}: {pr['kind']} {what}"
+    what = pr["fixes"]["target"] if pr["fixes"] else ", ".join(a["ac"] for a in pr["implements_acs"])
+    title = f"Developer #{issue}: {pr['kind']} {what}".rstrip()
     return title if len(title) <= MAX_TITLE else title[:MAX_TITLE - 1] + "…"
 
 
