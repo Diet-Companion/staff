@@ -103,7 +103,7 @@ def render_component(a):
     return out + [""]
 
 
-def render_interface(a, specs):
+def render_interface(a, specs, inline=True, run_id=""):
     out = head(a, f"interface `{esc(a['name'])}` ({esc(a['kind'])})")
     out += [f"Owner: {esc(a['owner'])} · Compatibility policy: {esc(a['compatibility_policy'] or 'not set (yours to decide)')}",
             "", "| Version | Status | Spec |", "| --- | --- | --- |"]
@@ -117,8 +117,16 @@ def render_interface(a, specs):
         path = declared.get(s["version"], "")
         if not (path.startswith(base) and re.fullmatch(r"[A-Za-z0-9._/-]+", path) and ".." not in path):
             path = f"{base}{s['version']}.{SPEC_EXT.get(s['format'].lower(), 'txt')}"
-        out += [f"<details><summary>Proposed spec <code>{esc(path)}</code> ({esc(s['format'])})</summary>", "",
-                fenced(s["document"]), "", "</details>", ""]
+        if inline:
+            out += [f"<details><summary>Proposed spec <code>{esc(path)}</code> ({esc(s['format'])})</summary>", "",
+                    fenced(s["document"]), "", "</details>", ""]
+        else:
+            # Too long for one comment (GitHub's limit): the spec stays in the run's validated output, which
+            # the acceptance commit is built from. run_id is format-checked (FOOTER_FORMATS), so it goes into
+            # the code span unescaped.
+            out += [f"Proposed spec <code>{esc(path)}</code> ({esc(s['format'])}): {len(s['document']):,} characters, "
+                    f"too long to show here. It is in the `architect-run-{run_id}` artifact of this run "
+                    "(`validated.json`, `spec_versions`).", ""]
     return out
 
 
@@ -141,7 +149,11 @@ def render_artifact(a, data, args):
     elif a["type"] == "component":
         out = render_component(a)
     elif a["type"] == "interface":
-        out = render_interface(a, [s for s in data["spec_versions"] if s["if_id"] == a["id"]])
+        specs = [s for s in data["spec_versions"] if s["if_id"] == a["id"]]
+        text = "\n".join(render_interface(a, specs) + patch(a) + [STAGE_NOTE, "", footer(args)]) + "\n"
+        if len(text) <= MAX_COMMENT_CHARS:
+            return text
+        out = render_interface(a, specs, inline=False, run_id=args.run_id)
     else:
         out = render_qas(a)
     out += patch(a) + [STAGE_NOTE, "", footer(args)]
