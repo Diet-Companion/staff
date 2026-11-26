@@ -41,6 +41,9 @@ COMMENT_KINDS = {"operator": OPERATOR_KIND, "analyst_app": AGENTS["analyst"]["ap
 COMMAND = AGENTS["analyst"]["command"]
 REVIEW_COMMAND = "/review"  # the human's review log (log_review.py), never intake content
 DEFAULT_MAX_BYTES = 100_000
+# The Architect's own draft comments carry whole interface specs and component files, so one
+# design round alone can pass 100 KB.
+MAX_BYTES_BY_AGENT = {"architect": 300_000}
 
 
 def fetch_comments(repo, number):
@@ -153,7 +156,8 @@ def main():
     ap.add_argument("--product-core", default="knowledge/product-core.md")
     ap.add_argument("--product-core-exists", choices=["true", "false"], default="true")
     ap.add_argument("--comments-file", help="read comments from this JSON array instead of gh api")
-    ap.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
+    ap.add_argument("--max-bytes", type=int, default=None,
+                    help=f"default {DEFAULT_MAX_BYTES}, or the agent's entry in MAX_BYTES_BY_AGENT")
     args = ap.parse_args()
 
     event = load_json(args.event, "input_invalid")
@@ -169,8 +173,9 @@ def main():
                  args.product_core, args.product_core_exists == "true", args.agent)
     text = json.dumps(data, indent=1, ensure_ascii=False) + "\n"
     size = len(text.encode("utf-8"))
-    if size > args.max_bytes:
-        raise HarnessError("input_too_large", f"{size} bytes > {args.max_bytes}")
+    limit = args.max_bytes or MAX_BYTES_BY_AGENT.get(args.agent, DEFAULT_MAX_BYTES)
+    if size > limit:
+        raise HarnessError("input_too_large", f"{size} bytes > {limit}")
     with open(args.out, "w", encoding="utf-8") as fh:
         fh.write(text)
     print(f"input: {size} bytes, {len(data['untrusted']['comments'])} comments kept, "
