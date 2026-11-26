@@ -276,6 +276,22 @@ class CheckDeveloperTest(unittest.TestCase):
         self.assertEqual([(x["id"], x["priority"]) for x in out["questions"]], [("Q-002", 1), ("Q-001", 2)])
         self.assertFalse(order_questions(out))  # already in order: unchanged
 
+    def test_silent_no_op_on_a_ready_ticket_fails(self):
+        # diet-companion#160: a "Placeholder to be replaced." summary, no PR and nothing raised.
+        out = load("developer-feature.json")
+        out.update(pr=None, proposed_files=[], design_requests=[], decision_summary="Placeholder to be replaced.")
+        self.assert_reason(out, "no_output")
+        q = {"id": "Q-001", "key": {"entity": "x", "target_id": None, "attribute": "y"}, "blocks": ["REQ-012/AC-001"],
+             "text": "t", "options": [{"id": "a", "text": "a"}, {"id": "b", "text": "b"}], "recommended": "a",
+             "blocking": True, "priority": 1}
+        check_developer(dict(out, questions=[q]), feature_input())  # a question is an answer
+        exp = feature_input()
+        exp["developer"]["round"] = {"trigger": "review", "pr": 9, "check_round": 0}
+        check_developer(out, exp)  # a PR round may decline in the summary
+        exp = feature_input()
+        exp["developer"]["readiness"] = {"status": "waiting", "acs": [], "blockers": ["x"]}
+        check_developer(out, exp)  # a waiting ticket proposes nothing
+
     def test_bootstrap_and_fix_shapes(self):
         boot = load("developer-bootstrap.json")
         exp = dev_input(kind="bootstrap", body="Area: system", entry=None)
