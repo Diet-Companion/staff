@@ -514,6 +514,8 @@ class RenderTest(unittest.TestCase):
         long = copy.deepcopy(out["pr"])
         long["implements_acs"] = [{"ac": f"REQ-012/AC-{i:03d}", "part": "full"} for i in range(1, 20)]
         self.assertLessEqual(len(pr_title(long, 41)), 120)
+        bare = dict(out["pr"], kind="refactor", implements_acs=[], fixes=None)
+        self.assertEqual(pr_title(bare, 98), "Developer #98: refactor")
         marker = re.search(r"<!-- staff-pr-block:v1 ([A-Za-z0-9+/=]+) -->\n\Z", body)
         self.assertIsNotNone(marker)
         self.assertEqual(json.loads(base64.b64decode(marker.group(1))), out["pr"])
