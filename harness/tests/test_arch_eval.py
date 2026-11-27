@@ -87,7 +87,7 @@ class ScoreTest(unittest.TestCase):
         self.assertEqual(r["counts"], {"quality_driver_coverage": [1, 1], "conflict_recall": [1, 1],
                                        "defect_recall": [0, 1], "defect_precision": [0, 0],
                                        "interface_coverage": [0, 1], "unnecessary_breaking_rate": [0, 1],
-                                       "invented_fact_rate": [0, 1]})
+                                       "invented_fact_rate": [0, 1], "unrecorded_figure_rate": [0, 1]})
         self.assertEqual((r["status"], r["breaches"], r["agent"], r["run"]), ("completed", [], "architect", 1))
         self.assertEqual(r["diagnostics"]["spec_versions_by_class"], {"new": 1, "compatible": 0, "breaking": 0})
         self.assertEqual(r["diagnostics"]["driver_attribute_misses"], 0)
@@ -162,22 +162,23 @@ class ScoreTest(unittest.TestCase):
         self.assertEqual(self.score(out=none)["counts"]["unnecessary_breaking_rate"], [0, 0])
 
     def test_invented_facts(self):
+        def figures(r):
+            return r["counts"]["invented_fact_rate"], r["counts"]["unrecorded_figure_rate"], r["diagnostics"]["figures_stated"]
         o = copy.deepcopy(DESIGN)
         o["assumptions"] = []
-        self.assertEqual(self.score(out=o)["counts"]["invented_fact_rate"], [0, 1])   # the ADR's own assumption
+        self.assertEqual(figures(self.score(out=o)), ([0, 1], [0, 1], 0))        # the ADR's own assumption
         o["artifacts"][1]["assumptions"] = []
-        r = self.score(out=o)
-        self.assertEqual((r["counts"]["invented_fact_rate"], r["diagnostics"]["figures_stated"]), ([1, 1], 0))
-        o["decision_summary"] += " The peak is about 40 per second."      # stated with a value: a diagnostic only
-        r = self.score(out=o)
-        self.assertEqual((r["diagnostics"]["figures_stated"], r["diagnostics"]["figures_stated_no_assumption"]), (1, 1))
+        self.assertEqual(figures(self.score(out=o)), ([0, 1], [1, 1], 0))        # unrecorded, but no value invented
+        o["decision_summary"] += " The peak is about 40 per second."      # stated with a value, no assumption
+        self.assertEqual(figures(self.score(out=o)), ([1, 1], [1, 1], 1))
         o = copy.deepcopy(DESIGN)
         o["assumptions"][0]["key"].update(entity="Orders", attribute="RPS")
         o["artifacts"][1]["assumptions"] = []
+        o["decision_summary"] += " The peak is about 40 per second."
         t = bundle()
-        self.assertEqual(self.score(t, o)["counts"]["invented_fact_rate"], [1, 1])
+        self.assertEqual(figures(self.score(t, o))[:2], ([1, 1], [1, 1]))
         t["spec"]["unknown_figures"][0]["aliases"] = [{"entity": "orders", "attribute": "rps"}]
-        self.assertEqual(self.score(t, o)["counts"]["invented_fact_rate"], [0, 1])
+        self.assertEqual(figures(self.score(t, o))[:2], ([0, 1], [0, 1]))  # recorded under an alias: stated is fine
 
     def test_stopped_runs(self):
         self.assertTrue(OUTPUT_REASONS <= REASONS)
@@ -288,6 +289,15 @@ class AggregateTest(unittest.TestCase):
         self.assertEqual((agg["valid"], agg["infra_failures"], agg["passed"], agg["consecutive"]), (False, 1, False, False))
         self.assertIn("**invalid**", summary_counts(agg))
         self.assertIn("hit the account's usage limit", summary_counts(agg))
+
+    def test_unrecorded_figures_are_reported_not_gated(self):
+        rs = self.promotion()
+        for r in rs[:8]:
+            r["counts"]["unrecorded_figure_rate"] = [1, 1]
+        agg = self.agg(rs)
+        self.assertTrue(agg["passed"])
+        self.assertEqual(agg["reported"]["unrecorded_figure_rate"], {"count": [8, 8], "value": 1.0})
+        self.assertIn("| unrecorded figure rate | 100% | 8/8 | | reported, not gated | |", summary_counts(agg))
 
     def test_thresholds_are_the_scorer_metrics(self):
         self.assertEqual(tuple(AGENT_THRESHOLDS["architect"]), METRICS)

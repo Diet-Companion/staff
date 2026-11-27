@@ -42,7 +42,10 @@ Metrics, as counts that eval_aggregate.py pools over bundles and runs (S-GEN-035
   unnecessary_breaking_rate  spec versions classed breaking (D7) on an IF where a compatible design is possible
                              (no need on it expects breaking) / spec versions produced. Revisions of the bundle's
                              editable versions are left out. None produced: 0 of 0
-  invented_fact_rate         planted figures with no assumption whose (entity, attribute) key matches (D2)
+  invented_fact_rate         planted figures stated with a value and no assumption whose (entity, attribute) key
+                             matches / planted figures (S-ARCH-049's formula; D2 as changed 2026-11-27)
+  unrecorded_figure_rate     planted figures with no matching assumption, stated or not / planted figures. Reported,
+                             not gated, until the operator sets a threshold
 
 D7 classes a spec version from its number: `new` for an IF not on the view, `breaking` when its major is above
 the latest approved or deprecated version's on the view, else `compatible`.
@@ -73,6 +76,7 @@ from validate_output import ARCH_OWNER_FIELDS, architecture_truth, check_assumpt
 SPEC_KEYS = ("quality_drivers", "conflicts", "defects", "interface_needs", "unknown_figures")
 METRICS = ("quality_driver_coverage", "conflict_recall", "defect_recall", "defect_precision",
            "interface_coverage", "unnecessary_breaking_rate", "invented_fact_rate")
+REPORTED = ("unrecorded_figure_rate",)   # scored and shown, not gated (operator decision, 2026-11-27)
 # A run stopped by one of these produced output that failed a harness check: a hard-limit breach
 # ("schema-valid output", S-ARCH-049), as eval_score.OUTPUT_REASONS for the Developer.
 OUTPUT_REASONS = {
@@ -282,7 +286,8 @@ def score(task, record, validated, validation, truth, areas, run=1):
         "counts": {"quality_driver_coverage": [0, len(drivers)], "conflict_recall": [0, len(conflicts)],
                    "defect_recall": [0, len(defects)], "defect_precision": [0, 0],
                    "interface_coverage": [0, len(needs)], "unnecessary_breaking_rate": [0, 0],
-                   "invented_fact_rate": [len(figures), len(figures)]},
+                   "invented_fact_rate": [len(figures), len(figures)],
+                   "unrecorded_figure_rate": [len(figures), len(figures)]},
         "breaches": [], "diagnostics": {},
     }
     if not ok:
@@ -339,10 +344,10 @@ def score(task, record, validated, validation, truth, areas, run=1):
     diag["editable_revised"] = len(validated["spec_versions"]) - produced
 
     texts = list(strings(validated))
-    invented = [f for f in figures if not assumed(f, validated)]
-    counts["invented_fact_rate"][0] = len(invented)
+    unrecorded = [f for f in figures if not assumed(f, validated)]
+    counts["invented_fact_rate"][0] = sum(1 for f in unrecorded if stated_with_value(f, texts))
+    counts["unrecorded_figure_rate"][0] = len(unrecorded)
     diag["figures_stated"] = sum(1 for f in figures if stated_with_value(f, texts))
-    diag["figures_stated_no_assumption"] = sum(1 for f in invented if stated_with_value(f, texts))
 
     if any(a["type"] == "adr" and not OPTIONS_RANGE[0] <= len(a["options"]) <= OPTIONS_RANGE[1] for a in arts):
         result["breaches"].append("adr_options_out_of_range")
