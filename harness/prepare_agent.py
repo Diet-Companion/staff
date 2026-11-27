@@ -209,8 +209,35 @@ SEEDER_CONTRACT = """\
   once. Write nothing else.
 """
 
+SEEDER_ARCHITECT_CONTRACT = """\
+# Harness contract (staff harness, seeding run)
+
+- **Input (the seeding request).** The JSON file named in the user message. Read it first
+  with the Read tool. `kind` and `slot` say what to write, and `plan` gives the exact counts
+  for this slot: quality drivers, conflicts, defects, interface needs (and how many of them
+  expect a breaking version), and unknown figures. Your `spec` must have exactly those
+  counts. `existing` lists the tickets of the set's other bundles. `previous`, when present,
+  is your last attempt at this slot and the validity check's refusal: `failures`, as fixed
+  codes with the bundle's own IDs and paths. Fix exactly what was refused, and return the
+  whole bundle again.
+- **Repo.** Your working directory is the product repo at the pinned commit, read-only.
+- **What the Architect sees.** Only the base, your `overlay` (under `requirements/`,
+  `architecture/` and `knowledge/rules/` only) and your `ticket`. Nothing in them may mark a
+  plant: no corrected text, and no words like TBD, seeded, planted, eval or holdout.
+- **Checked without GitHub.** The check runs ready-gate items 1 to 4 on every overlay
+  requirement with no way to resolve comment refs, so a ready requirement here has no answered
+  question, confirmed assumption or accepted change.
+- **Nothing runs here.** After validation, the harness checks your bundle in a job with no
+  secrets (S-GEN-067) and stores it in the private eval repo only if it passes.
+- **No secret-like strings.** The output is redaction-checked and dropped whole on a hit
+  (S-SEC-004).
+- **Output.** Return your one JSON object by calling the StructuredOutput tool exactly
+  once. Write nothing else.
+"""
+
 CONTRACTS = {"analyst": ANALYST_CONTRACT, "reviewer": REVIEWER_CONTRACT, "architect": ARCHITECT_CONTRACT,
-             "developer": DEVELOPER_CONTRACT, "test-gen": TEST_GEN_CONTRACT, "seeder": SEEDER_CONTRACT}
+             "developer": DEVELOPER_CONTRACT, "test-gen": TEST_GEN_CONTRACT, "seeder": SEEDER_CONTRACT,
+             "seeder-architect": SEEDER_ARCHITECT_CONTRACT}
 
 
 def split_front_matter(path):
