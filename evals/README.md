@@ -66,3 +66,10 @@ A seeded bundle has 0 to 2 conflicts, at most 1 defect and exactly 1 unknown fig
 To run the Architect on a bundle: `eval_task.py materialize --agent architect --layers overlay` builds the
 tree it sees, and `eval_task.py event --agent architect` writes the synthetic `arch:design` event and the
 comment list for `build_input.py --agent architect`.
+
+**Scoring** (`arch_eval.py score`, no secrets): rebuilds the view, matches the validated output to the spec by
+key, and writes counts per metric: quality-driver coverage, conflict recall, defect recall and precision,
+interface coverage, unnecessary-breaking rate and invented-fact rate. It also records hard-limit breaches
+(invalid output, an ADR without 2 to 4 options, a human-owned field set, a write outside scope) and
+diagnostics. Keys are compared by `eval_keys.py`: case, `_`, `-` and spaces are normalised, and the spec's
+aliases count.
