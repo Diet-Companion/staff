@@ -281,6 +281,14 @@ class AggregateTest(unittest.TestCase):
         return aggregate_counts(results, kw.get("set_id", "set-1"), "architect", kw.get("sha", "0" * 40), "m",
                                 previous, kw.get("rescore_of"))
 
+    def test_usage_limit_makes_the_run_invalid(self):
+        results = self.promotion()
+        results[3] = dict(results[3], status="crashed", reason="usage_limit", breaches=[])
+        agg = self.agg(results, previous=dict(self.agg(self.promotion()), staff_sha="0" * 40))
+        self.assertEqual((agg["valid"], agg["infra_failures"], agg["passed"], agg["consecutive"]), (False, 1, False, False))
+        self.assertIn("**invalid**", summary_counts(agg))
+        self.assertIn("hit the account's usage limit", summary_counts(agg))
+
     def test_thresholds_are_the_scorer_metrics(self):
         self.assertEqual(tuple(AGENT_THRESHOLDS["architect"]), METRICS)
 

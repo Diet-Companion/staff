@@ -19,7 +19,7 @@ REASONS = {
     "claude_timeout", "claude_failed",
     # envelope and output (validate_output.py)
     "envelope_invalid", "cost_unknown", "cost_cap", "max_turns", "budget_exceeded",
-    "model_error", "no_output", "output_not_json", "schema_invalid",
+    "model_error", "usage_limit", "no_output", "output_not_json", "schema_invalid",
     "multiple_epics", "parent_mismatch", "blocking_order", "duplicate_id",
     "ac_id_mismatch", "recommended_not_option", "unknown_area", "stage_violation", "revision_rewritten",
     # reviewer output (validate_output.py --agent reviewer)

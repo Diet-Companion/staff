@@ -55,6 +55,12 @@ def meets(value, op, limit):
     return value is not None and (value >= limit if op == ">=" else value <= limit)
 
 
+def infra_failures(results):
+    """Results whose run never reached the model because the account's usage limit was hit. They say nothing
+    about the agent, so a run holding any is invalid: neither a pass nor a fail, and not an attempt."""
+    return sum(1 for r in results if r.get("reason") == "usage_limit")
+
+
 def tallies(results):
     """(breaches per code, counts per status, summed cost, whether every result had a cost)."""
     breaches = {}
@@ -116,7 +122,9 @@ def aggregate(results, set_id, agent, staff_sha, model, rescore_of=None):
                                  for k in ("no_test_added", "tests_not_run", "fails_on_corrected", "passes_on_seeded")},
         "rescore_of": rescore_of,
         "hard_limit_breaches": breaches,
-        "passed": all(checks.values()) and not breaches,
+        "infra_failures": infra_failures(results),
+        "valid": not infra_failures(results),
+        "passed": all(checks.values()) and not breaches and not infra_failures(results),
         "statuses": statuses,
         "cost_usd": round(sum(costs), 4),
         "cost_complete": len(costs) == len(results),
@@ -153,7 +161,8 @@ def aggregate_counts(results, set_id, agent, staff_sha, model, previous=None, re
                     diagnostics.setdefault(k, {})[kk] = diagnostics.get(k, {}).get(kk, 0) + vv
             elif isinstance(v, (int, float)) and not isinstance(v, bool):
                 diagnostics[k] = diagnostics.get(k, 0) + v
-    passed = all(checks.values()) and not breaches
+    infra = infra_failures(results)
+    passed = all(checks.values()) and not breaches and not infra
     same = previous is not None and all(previous.get(k) == v for k, v in (
         ("agent", agent), ("set_id", set_id), ("staff_sha", staff_sha), ("model", model)))
     # A re-score is a diagnostic, not a promotion attempt, on either side.
@@ -180,6 +189,8 @@ def aggregate_counts(results, set_id, agent, staff_sha, model, previous=None, re
         "diagnostics": diagnostics,
         "rescore_of": rescore_of,
         "hard_limit_breaches": breaches,
+        "infra_failures": infra,
+        "valid": not infra,
         "passed": passed,
         "previous_passed": None if previous is None else bool(same and previous.get("passed") is True),
         "consecutive": consecutive,
@@ -190,12 +201,22 @@ def aggregate_counts(results, set_id, agent, staff_sha, model, previous=None, re
     }
 
 
+def verdict(agg):
+    return "invalid" if not agg.get("valid", True) else ("pass" if agg["passed"] else "fail")
+
+
+def infra_line(agg):
+    n = agg.get("infra_failures") or 0
+    return [f"**Invalid run:** {n} result(s) hit the account's usage limit before the model ran. Re-run the set; "
+            "this run is not an attempt.", ""] if n else []
+
+
 def summary_counts(agg):
     pct = lambda v: "n/a" if v is None else f"{v * 100:.0f}%"
-    title = f"### {agg['agent'].capitalize()} eval, set `{agg['set_id']}`: **{'pass' if agg['passed'] else 'fail'}**"
+    title = f"### {agg['agent'].capitalize()} eval, set `{agg['set_id']}`: **{verdict(agg)}**"
     if agg.get("rescore_of"):
         title += f" (re-score of run {agg['rescore_of']}: a diagnostic, not a promotion attempt)"
-    lines = [title, "",
+    lines = [title, "", *infra_line(agg),
              f"{agg['tasks']} tasks ({', '.join(f'{n} {k}' for k, n in agg['tasks_by_kind'].items())}), "
              f"{agg['runs']} run(s) each, cost ${agg['cost_usd']:.2f}{'' if agg['cost_complete'] else ' (incomplete)'}.", "",
              "| Metric | Value | Count | Per-run range | Threshold | Met |", "| --- | --- | --- | --- | --- | --- |"]
@@ -216,10 +237,10 @@ def summary_counts(agg):
 
 def summary(agg):
     pct = lambda v: "n/a" if v is None else f"{v * 100:.0f}%"
-    title = f"### Developer eval, set `{agg['set_id']}`: **{'pass' if agg['passed'] else 'fail'}**"
+    title = f"### Developer eval, set `{agg['set_id']}`: **{verdict(agg)}**"
     if agg.get("rescore_of"):
         title += f" (re-score of run {agg['rescore_of']}: a diagnostic, not a promotion attempt)"
-    lines = [title, "",
+    lines = [title, "", *infra_line(agg),
              f"{agg['tasks']} tasks ({', '.join(f'{n} {k}' for k, n in agg['tasks_by_kind'].items())}), "
              f"cost ${agg['cost_usd']:.2f}{'' if agg['cost_complete'] else ' (incomplete)'}.", "",
              "| Metric | Value | Threshold | Met |", "| --- | --- | --- | --- |"]
@@ -271,7 +292,7 @@ def main():
     if args.summary:
         with open(args.summary, "w", encoding="utf-8") as fh:
             fh.write(text)
-    line = f"eval {'pass' if agg['passed'] else 'fail'}: {agg['tasks']} tasks"
+    line = f"eval {verdict(agg)}: {agg['tasks']} tasks"
     if args.previous:
         line += f", consecutive: {'yes' if agg['consecutive'] else 'no'}"
     print(line)

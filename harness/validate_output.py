@@ -48,6 +48,11 @@ def turn_limit(env):
     return {"num_turns": turns, "max_turns": int(limit)} if turns >= int(limit) else None
 
 
+# The CLI's message when a subscription's usage window is spent ("You've hit your 5-hour limit ..."). Only
+# matched on a run that cost nothing, so model text never reaches it.
+USAGE_LIMIT_RE = re.compile(r"\b(hit your [\w -]{0,30}limit|usage limit)\b", re.I)
+
+
 def check_run(env, max_usd):
     if not isinstance(env, dict) or env.get("type") != "result":
         raise HarnessError("envelope_invalid", "not a claude -p result envelope")
@@ -59,6 +64,9 @@ def check_run(env, max_usd):
     subtype = metrics(env)["subtype"]
     if subtype in SUBTYPE_REASONS:
         raise HarnessError(SUBTYPE_REASONS[subtype], f"run ended with {subtype}")
+    if env.get("is_error") and not cost and USAGE_LIMIT_RE.search(str(env.get("result", ""))):
+        # The account ran out of usage before the model did any work: no agent output to judge.
+        raise HarnessError("usage_limit", "the account's usage limit was reached before the model ran")
     if env.get("is_error") or subtype != "success":
         raise HarnessError("model_error", f"run ended with is_error={env.get('is_error')}, subtype={subtype}")
 

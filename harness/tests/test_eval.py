@@ -297,6 +297,13 @@ class AggregateTest(unittest.TestCase):
         self.assertIn("**pass**", text)
         self.assertNotIn("task_id", json.dumps(agg))
 
+    def test_usage_limit_makes_the_run_invalid(self):
+        results = self.promotion()
+        results[0] = result("feature", status="crashed", reason="usage_limit", heldout_count=5)
+        agg = aggregate(results, "set-1", "developer", "0" * 40, "m")
+        self.assertEqual((agg["valid"], agg["infra_failures"], agg["passed"]), (False, 1, False))
+        self.assertIn("**invalid**", summary(agg))
+
     def test_stray_escalation_breakdown(self):
         rs = self.promotion()
         rs[0] = result("feature", heldout_passed=4, heldout_count=5, escalations=1, false_escalations=1)
