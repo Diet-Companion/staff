@@ -44,6 +44,8 @@ ANSWER_HINT = ("Answer in a comment as `Q-001: b` (or free text); then comment `
 STAGE_NOTE = ("Stage-1 draft: nothing is committed (S-DEV-022). To take it, apply the patch artifact "
               "on a branch and open the PR yourself.")
 PR_NOTE = "Stage 2: the change is in {pr}. Review and merge it there; every PR gets your full review (S-GEN-052)."
+PR_NOT_UPDATED_NOTE = ("Stage 2: {pr} isn't updated, because this round's change didn't pass the work sandbox "
+                       "(S-DEV-020). The PR still holds the previous round's change.")
 PR_MISSING_NOTE = ("Stage 2: the change passed the work sandbox, but publishing the PR failed. See the run's logs; "
                    "the patch artifact is attached to the run.")
 MAX_TITLE = 120
@@ -198,6 +200,8 @@ def stage_note(args, sandbox):
         return PR_NOTE.format(pr=f"#{args.pr_number}")
     if sandbox is not None and sandbox.get("status") == "pass":
         return PR_MISSING_NOTE
+    if getattr(args, "open_pr", None):  # a PR round (review or check) whose draft failed
+        return PR_NOT_UPDATED_NOTE.format(pr=f"#{args.open_pr}")
     return "Stage 2: no PR, because the change didn't pass the work sandbox (S-DEV-020)."
 
 
@@ -260,6 +264,7 @@ def main():
     ap.add_argument("--reason")
     ap.add_argument("--issue", type=int, help="pr: the ticket's issue number")
     ap.add_argument("--pr-number", type=int, help="render, stage 2: the PR the change was pushed to")
+    ap.add_argument("--open-pr", type=int, help="render, stage 2: the agent PR a review or check round works on")
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--run-url", default="")

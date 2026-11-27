@@ -527,6 +527,10 @@ class RenderTest(unittest.TestCase):
         failing = dict(passing, status="fail")
         main = dict(render(out, META, APPLIED, failing, Stage2, {})[0])["00-main.md"]
         self.assertIn("no PR, because the change didn't pass", main)
+        Stage2.open_pr = 57  # a review round on #57 whose draft failed: the PR exists but isn't updated
+        main = dict(render(out, META, APPLIED, failing, Stage2, {})[0])["00-main.md"]
+        self.assertIn("#57 isn't updated, because this round's change didn't pass", main)
+        self.assertNotIn("no PR", main)
 
     def test_pr_title_and_body(self):
         out = load("developer-feature.json")
