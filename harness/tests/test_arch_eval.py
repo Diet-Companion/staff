@@ -8,7 +8,7 @@ import unittest
 from helpers import FIXTURES, run_cli
 from arch_eval import METRICS, OUTPUT_REASONS, score, spec_elements, unit_of, version_class
 from common import REASONS, HarnessError
-from eval_aggregate import AGENT_THRESHOLDS, aggregate_counts, summary_counts
+from eval_aggregate import AGENT_THRESHOLDS, aggregate_counts, compare, summary_counts
 from eval_keys import key_matches, name_matches, norm
 from test_eval import product_repo, write
 
@@ -178,6 +178,14 @@ class ScoreTest(unittest.TestCase):
         self.assertEqual(self.score(t, o)["counts"]["invented_fact_rate"], [1, 1])
         t["spec"]["unknown_figures"][0]["aliases"] = [{"entity": "orders", "attribute": "rps"}]
         self.assertEqual(self.score(t, o)["counts"]["invented_fact_rate"], [0, 1])
+
+    def test_golden_split(self):
+        self.assertNotIn("split", self.score())                                      # a promotion bundle has none
+        stop = {"status": "timeout", "validation": {"ok": False, "reason": "claude_timeout"}}
+        for split in ("visible", "hidden"):
+            t = dict(bundle(), set="golden", split=split)
+            self.assertEqual((self.score(t)["set"], self.score(t)["split"]), ("golden", split))
+            self.assertEqual(self.score(t, record=stop)["split"], split)           # a stopped run keeps its side
 
     def test_stopped_runs(self):
         self.assertTrue(OUTPUT_REASONS <= REASONS)
@@ -376,6 +384,136 @@ class AggregateTest(unittest.TestCase):
         self.assertIn("input_invalid", res.stderr)                      # the Developer path takes no --previous
         with open(os.path.join(d, "s.md")) as fh:
             self.assertIn("Architect eval", fh.read())
+
+
+def golden(run=1, misses=None):
+    """A golden run: 11 seeded and 3 clean visible results, 5 seeded and 1 clean hidden (the golden plan's split).
+    misses maps a metric to how many (visible, hidden) results miss it."""
+    rs = []
+    for split, n_seeded, n_clean in (("visible", 11, 3), ("hidden", 5, 1)):
+        for i in range(n_seeded + n_clean):
+            rs.append(dict(arch_result(f"{split[0]}{i}", kind="seeded" if i < n_seeded else "clean", run=run),
+                           set="golden", split=split))
+    for name, (vis, hid) in (misses or {}).items():
+        for r in [r for r in rs if r["split"] == "visible"][:vis] + [r for r in rs if r["split"] == "hidden"][:hid]:
+            r["counts"][name] = [0, 1] if name != "invented_fact_rate" else [1, 1]
+    return rs
+
+
+class GoldenAggregateTest(unittest.TestCase):
+    def agg(self, results, set_id="golden-1"):
+        return aggregate_counts(results, set_id, "architect", "0" * 40, "m")
+
+    def verdicts(self, reg):
+        return {n: m["verdict"] for n, m in reg["metrics"].items() if m["verdict"] != "no detectable difference"}
+
+    def test_by_split(self):
+        agg = self.agg(golden(misses={"conflict_recall": (0, 1)}))
+        by = agg["by_split"]
+        self.assertEqual((by["visible"]["tasks"], by["hidden"]["tasks"], agg["tasks"]), (14, 6, 20))
+        self.assertEqual((by["visible"]["tasks_by_kind"], by["hidden"]["tasks_by_kind"]),
+                         ({"seeded": 11, "clean": 3}, {"seeded": 5, "clean": 1}))
+        self.assertEqual((by["visible"]["counts"]["conflict_recall"], by["hidden"]["counts"]["conflict_recall"],
+                          agg["counts"]["conflict_recall"]), ([14, 14], [5, 6], [19, 20]))
+        self.assertEqual((by["hidden"]["metrics"]["conflict_recall"], by["hidden"]["per_run"]["conflict_recall"]),
+                         (0.8333, {"min": 0.8333, "max": 0.8333}))
+        text = summary_counts(agg)
+        self.assertIn("Per split (S-GEN-037): visible 14 (11 seeded, 3 clean); hidden 6 (5 seeded, 1 clean).", text)
+        self.assertIn("| conflict recall | 100% (14/14) | 83% (5/6) |", text)
+        for secret in ("task_id", "v0", "h1"):
+            self.assertNotIn(secret, json.dumps(agg) + text)
+        promotion = AggregateTest().promotion()
+        self.assertNotIn("by_split", self.agg(promotion))                            # promotion: unchanged
+        self.assertNotIn("Per split", summary_counts(self.agg(promotion)))
+
+    def test_split_refusals(self):
+        with self.assertRaises(HarnessError):
+            self.agg(golden() + [arch_result("p0")])                                  # a result without a split
+        rs = golden()
+        rs[0]["split"] = "holdout"
+        with self.assertRaises(HarnessError):
+            self.agg(rs)
+
+    def test_same_scores(self):
+        reg = compare(self.agg(golden()), self.agg(golden()))
+        self.assertEqual((reg["verdict"], reg["possible_overfitting"], reg["same_set"]),
+                         ("no detectable difference", [], True))
+        self.assertEqual(reg["metrics"]["conflict_recall"]["combined"],
+                         {"baseline": 1.0, "new": 1.0, "points": 0.0, "regressed": False, "better": False})
+
+    def test_regression(self):
+        base = self.agg(golden())
+        reg = compare(self.agg(golden(misses={"conflict_recall": (1, 1)})), base)    # 18 of 20: 10 points down
+        self.assertEqual((reg["verdict"], self.verdicts(reg)), ("regression", {"conflict_recall": "regression"}))
+        self.assertEqual(reg["metrics"]["conflict_recall"]["combined"]["points"], -10.0)
+        reg = compare(self.agg(golden(misses={"conflict_recall": (1, 0)})), base)    # 5 points: not more than 5
+        self.assertEqual(reg["verdict"], "no detectable difference")
+        reg = compare(self.agg(golden(misses={"invented_fact_rate": (1, 1)})), base)  # lower is better: 0% to 10%
+        self.assertEqual(self.verdicts(reg), {"invented_fact_rate": "regression"})
+        self.assertEqual(reg["metrics"]["invented_fact_rate"]["combined"]["points"], -10.0)
+        reg = compare(base, self.agg(golden(misses={"invented_fact_rate": (2, 1)})))  # 15% to 0%: better
+        self.assertEqual(self.verdicts(reg), {"invented_fact_rate": "improvement"})
+
+    def test_per_run_range(self):
+        base = self.agg(golden() + golden(run=2))                                   # both runs 100%
+        new = self.agg(golden(misses={"conflict_recall": (1, 0)}) + golden(run=2, misses={"conflict_recall": (1, 0)}))
+        reg = compare(new, base)                                                    # 95% and 95%: 5 points, all below
+        self.assertEqual((reg["metrics"]["conflict_recall"]["combined"]["points"], reg["verdict"]), (-5.0, "regression"))
+        one = compare(self.agg(golden(misses={"conflict_recall": (1, 0)})), self.agg(golden()))
+        self.assertEqual(one["verdict"], "no detectable difference")                # one run has no range
+
+    def test_improvement_needs_the_hidden_set(self):
+        base = self.agg(golden(misses={"conflict_recall": (4, 2)}))                 # 14 of 20
+        reg = compare(self.agg(golden()), base)
+        self.assertEqual((reg["verdict"], reg["possible_overfitting"]), ("improvement", []))
+        self.assertEqual(reg["metrics"]["conflict_recall"]["hidden"]["points"], 33.33)
+        base = self.agg(golden(misses={"conflict_recall": (6, 0)}))                 # 14 of 20, hidden all met
+        reg = compare(self.agg(golden(misses={"conflict_recall": (0, 2)})), base)   # 18 of 20, hidden 4 of 6
+        m = reg["metrics"]["conflict_recall"]
+        self.assertEqual((m["combined"]["points"], m["hidden"]["regressed"], m["verdict"]),
+                         (20.0, True, "no detectable difference"))
+        self.assertEqual(reg["possible_overfitting"], ["conflict_recall"])           # a gain on visible alone
+        text = summary_counts(dict(self.agg(golden(misses={"conflict_recall": (0, 2)})), regression=reg))
+        self.assertIn("Possible overfitting: conflict recall gained more than 5 points on the visible set alone.", text)
+        self.assertIn("| conflict recall | 70% | 90% | +20.0 pts | -33.3 pts | +42.9 pts | no detectable difference |", text)
+
+    def test_empty_and_invalid(self):
+        rs = [dict(r, counts=dict(r["counts"], defect_precision=[0, 0])) for r in golden()]
+        reg = compare(self.agg(rs), self.agg(golden()))
+        self.assertEqual((reg["metrics"]["defect_precision"]["verdict"], reg["verdict"]), ("n/a", "no detectable difference"))
+        rs = golden()
+        rs[0] = dict(rs[0], status="crashed", reason="usage_limit")
+        self.assertEqual(compare(self.agg(rs), self.agg(golden()))["verdict"], "invalid")
+        self.assertFalse(compare(self.agg(golden(), "golden-2"), self.agg(golden()))["same_set"])
+        for baseline in (self.agg(AggregateTest().promotion()),                     # not a golden aggregate
+                         dict(self.agg(golden()), agent="developer"),
+                         dict(self.agg(golden()), valid=False)):
+            with self.assertRaises(HarnessError):
+                compare(self.agg(golden()), baseline)
+        with self.assertRaises(HarnessError):                                       # no hidden results
+            compare(self.agg([r for r in golden() if r["split"] == "visible"]), self.agg(golden()))
+
+    def test_cli(self):
+        d = tempfile.mkdtemp()
+        results = os.path.join(d, "results")
+        os.makedirs(results)
+        for r in golden():
+            write(results, f"{r['task_id']}.json", r)
+        base = ["eval_aggregate.py", "--results", results, "--set-id", "s", "--agent", "architect", "--staff-sha", "0" * 40,
+                "--model", "m", "--expected", "20"]
+        first = os.path.join(d, "first.json")
+        self.assertEqual(run_cli(*base, "--out", first).returncode, 0)
+        summary = os.path.join(d, "s.md")
+        res = run_cli(*base, "--out", os.path.join(d, "second.json"), "--summary", summary, "--baseline", first)
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(res.stdout.strip(), "eval pass: 20 tasks, regression rule: no detectable difference")
+        with open(summary) as fh:
+            self.assertIn("Regression rule against baseline `s` at staff `0000000`", fh.read())
+        with open(os.path.join(d, "second.json")) as fh:
+            self.assertEqual(json.load(fh)["regression"]["verdict"], "no detectable difference")
+        res = run_cli("eval_aggregate.py", "--results", results, "--set-id", "s", "--staff-sha", "0" * 40, "--model", "m",
+                      "--expected", "20", "--out", os.path.join(d, "x.json"), "--baseline", first)
+        self.assertIn("input_invalid", res.stderr)                      # the Developer path takes no --baseline
 
 
 if __name__ == "__main__":

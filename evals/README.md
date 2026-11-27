@@ -49,6 +49,14 @@ S-DEV-036); the maintainability judge (reported, not gating).
 The Architect's promotion set is 10 **design bundles**: 8 seeded with holdout seeds, 2 held-out clean.
 Each is scored by script on its spec keys; promotion needs two consecutive passing runs, one run per bundle.
 
+Its **golden set** is 20 bundles (`set: golden`): 16 seeded, 4 clean, no holdout seeds. Each carries its
+`split` (S-GEN-037), stratified by kind: 11 seeded and 3 clean are visible (`evals/visible/architect/`, through
+an eval-runner PR; until that identity exists they wait in staff-evals-private), 5 seeded and 1 clean hidden
+(staff-evals-private). `ARCH_GOLDEN_PLAN` in `seed_task.py` sets each slot's plant
+counts and split; the hidden slots alone plant conflicts, defects, a breaking interface need and unknown
+figures. The golden set measures skill and prompt changes by the regression rule (S-GEN-036); it never
+promotes.
+
 `schemas/architect-task.schema.json`, checked with `eval_task.py check --agent architect`:
 
 | Field | Seen by the Architect | What it is |
@@ -64,9 +72,11 @@ A seeded bundle has 0 to 2 conflicts, at most 1 defect and exactly 1 unknown fig
 (`spec.clean: true`) has none. Both have 1 to 3 quality drivers.
 
 **Seeding:** `seed_task.py request --agent architect` adds the slot's `plan`, the exact plant counts from
-`ARCH_SLOT_PLAN` (slot numbers never reach the bundle). The seeding agent returns
+`ARCH_SLOT_PLAN`, or `ARCH_GOLDEN_PLAN` with `--set golden` (slot numbers never reach the bundle, the split
+never reaches the seeding agent). The seeding agent returns
 `plugins/staff-meta/schemas/seeder-architect-output.schema.json` (contract `seeder-architect`), and
-`seed_task.py assemble --agent architect` turns it into a bundle. Seeded promotion bundles are holdout seeds.
+`seed_task.py assemble --agent architect` turns it into a bundle (with `--set golden --slot N`, adding the
+slot's split). Seeded promotion bundles are holdout seeds.
 `arch_eval.py check` is the validity check (S-GEN-067). It needs no secrets and runs no product code:
 ready-gate items 1 to 4 on the overlay requirements, live targets for every key, no source stating the
 unknown figure, the slot's plan, no leak of a plant into what the agent sees, and the input cap. On a pass
@@ -86,4 +96,9 @@ aliases count.
 **Aggregate** (`eval_aggregate.py --agent architect`): pools each metric's counts over bundle x run (S-GEN-035)
 against the S-ARCH-049 thresholds, with the per-run range beside it. Any breach fails the run. With
 `--previous <last aggregate>`, `consecutive: yes` means that aggregate passed for the same set, staff commit
-and model, and this one passed too.
+and model, and this one passed too. On golden results (`arch_eval.py score` copies the bundle's `split`) the
+aggregate also holds the totals per split (`by_split`). `--baseline <earlier golden aggregate>` applies the
+regression rule (S-GEN-036) per primary metric on visible and hidden combined: more than 5 points worse, or
+a per-run range entirely below the baseline's (2 or more runs on both sides), is a regression; more than 5
+points better with no regression on the hidden set alone is an improvement; anything else is no detectable
+difference. A gain on the visible set alone is flagged as possible overfitting.
