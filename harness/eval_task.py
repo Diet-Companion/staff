@@ -1,11 +1,15 @@
-"""Developer eval tasks (S-DEV-036): load one, build the tree the agent sees, and its ticket.
+"""Eval tasks (S-DEV-036, S-ARCH-049): load one, build the tree the agent sees, and its ticket.
 
-The eval runner keeps tasks in staff-evals-private. A task is one JSON file (evals/schemas/
-developer-task.schema.json): a pinned product commit, a ticket, and three file layers.
+The eval runner keeps tasks in staff-evals-private. A task is one JSON file. A Developer task
+(evals/schemas/developer-task.schema.json) is a pinned product commit, a ticket, and three file layers:
 
   overlay    written onto the product before the agent runs (requirements, architecture, a seeded bug)
   reference  the reference implementation or correction; the validity check and scoring only
   heldout    API tests put in tests/api/heldout/ at scoring time only
+
+An Architect bundle (evals/schemas/architect-task.schema.json, `--agent architect`) has the overlay
+only, under requirements/, architecture/ and knowledge/rules/, plus the ticket's comments and the spec
+the scorer matches outputs to. `--agent developer` is the default.
 
 Subcommands:
 
@@ -13,7 +17,8 @@ Subcommands:
   materialize  Export the product commit (tracked files only, no history), write the chosen layers, and
                commit the result as a fresh one-commit repo, so nothing in git hints at the task
                (S-GEN-040).
-  event        Write the synthetic `issues: labeled` event and an empty comment list for build_input.py.
+  event        Write the synthetic `issues: labeled` event for build_input.py, with the ticket's label, and
+               the comment list: the task's comments, authored by the operator (none for a Developer task).
   sandbox      Join the code map's build, unit and integration commands and the API layer's test command into the
                file eval_score.py runs (every command from the product's own .staff files, never the task).
 
@@ -35,6 +40,10 @@ from common import HarnessError, load_json, run_main, write_json
 
 HELDOUT_DIR = "tests/api/heldout"
 LAYERS = ("overlay", "reference", "heldout")
+AGENT_LAYERS = {"developer": LAYERS, "architect": ("overlay",)}
+AGENT_SCHEMAS = {"developer": "developer-task.schema.json", "architect": "architect-task.schema.json"}
+# What an Architect bundle may write: the artifacts the Architect reads as truth (S-ARCH-049).
+ARCH_OVERLAY = ("requirements/", "architecture/", "knowledge/rules/")
 # Fixed identity and date for the one commit, so the tree's history is the same for every task.
 GIT_ENV = {"GIT_AUTHOR_NAME": "eval", "GIT_AUTHOR_EMAIL": "eval@invalid", "GIT_COMMITTER_NAME": "eval",
            "GIT_COMMITTER_EMAIL": "eval@invalid", "GIT_AUTHOR_DATE": "2000-01-01T00:00:00Z",
@@ -49,6 +58,8 @@ def load_task(path, schema_path):
     if errors:
         where = "/" + "/".join(str(p) for p in errors[0].absolute_path)
         raise HarnessError("input_invalid", f"task {where} does not match the task schema")
+    if task["agent"] == "architect":
+        return check_architect_task(task)
     kind = task["kind"]
     want_label = "dev:fix" if kind == "fix" else "dev:implement"
     if task["ticket"]["label"] != want_label:
@@ -72,6 +83,25 @@ def load_task(path, schema_path):
     for f in task["reference"]:
         if f["path"].startswith(FORBIDDEN):
             raise HarnessError("input_invalid", "a reference path is outside the Developer's scope")
+    return task
+
+
+def check_architect_task(task):
+    """Kind and path rules of an Architect bundle (S-ARCH-049): both kinds have 1 to 3 quality drivers; a
+    seeded bundle has 0 to 2 conflicts, at most 1 defect and exactly 1 unknown figure; a clean one none."""
+    spec, kind = task["spec"], task["kind"]
+    if task["ticket"]["label"] != "arch:design":
+        raise HarnessError("input_invalid", "an Architect bundle needs the arch:design label")
+    plants = len(spec["conflicts"]) + len(spec["defects"]) + len(spec["unknown_figures"])
+    rules = {
+        "seeded": not spec["clean"] and len(spec["unknown_figures"]) == 1,
+        "clean": spec["clean"] and plants == 0,
+    }
+    if not rules[kind] or not 1 <= len(spec["quality_drivers"]) <= 3:
+        raise HarnessError("input_invalid", f"the spec does not fit a {kind} bundle")
+    for f in task["overlay"]:
+        if not f["path"].startswith(ARCH_OVERLAY):
+            raise HarnessError("input_invalid", "an overlay path is outside requirements/, architecture/, knowledge/rules/")
     return task
 
 
@@ -119,8 +149,9 @@ def cmd_check(args):
 def cmd_materialize(args):
     task = load_task(args.task, args.schema)
     layers = [x for x in args.layers.split(",") if x]
-    if layers[:1] != ["overlay"] or any(x not in LAYERS for x in layers):
-        raise HarnessError("input_invalid", "layers start with overlay and name only overlay, reference, heldout")
+    allowed = AGENT_LAYERS[task["agent"]]
+    if layers[:1] != ["overlay"] or any(x not in allowed for x in layers):
+        raise HarnessError("input_invalid", f"layers start with overlay and name only {', '.join(allowed)}")
     if os.path.exists(args.out):
         shutil.rmtree(args.out)
     os.makedirs(args.out)
@@ -134,15 +165,26 @@ def cmd_materialize(args):
     print(f"materialized {task['id']} with {'+'.join(layers)}")
 
 
+def synthetic_event(task, repo, operator):
+    """(the `issues: labeled` event, the issue's comments in the GitHub API shape) for build_input.py."""
+    t = task["ticket"]
+    url = f"https://github.com/{repo}/issues/1"
+    issue = {"number": 1, "title": t["title"], "body": t["body"], "state": "open", "html_url": url,
+             "user": {"login": operator, "type": "User"}, "labels": [{"name": t["label"]}]}
+    event = {"action": "labeled", "issue": issue, "label": {"name": t["label"]},
+             "repository": {"full_name": repo}, "sender": {"login": operator, "type": "User"}}
+    date = GIT_ENV["GIT_AUTHOR_DATE"]
+    comments = [{"id": n, "html_url": f"{url}#issuecomment-{n}", "user": {"login": operator, "type": "User"},
+                 "created_at": date, "updated_at": date, "body": c["body"]}
+                for n, c in enumerate(task.get("comments") or [], start=1)]
+    return event, comments
+
+
 def cmd_event(args):
     task = load_task(args.task, args.schema)
-    t = task["ticket"]
-    issue = {"number": 1, "title": t["title"], "body": t["body"], "state": "open",
-             "html_url": f"https://github.com/{args.repo}/issues/1",
-             "user": {"login": args.operator, "type": "User"}, "labels": [{"name": t["label"]}]}
-    write_json(args.out_event, {"action": "labeled", "issue": issue, "label": {"name": t["label"]},
-                                "repository": {"full_name": args.repo}, "sender": {"login": args.operator, "type": "User"}})
-    write_json(args.out_comments, [])
+    event, comments = synthetic_event(task, args.repo, args.operator)
+    write_json(args.out_event, event)
+    write_json(args.out_comments, comments)
     print("event written")
 
 
@@ -170,14 +212,15 @@ def cmd_sandbox(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    default_schema = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                  "evals", "schemas", "developer-task.schema.json")
+    schemas = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "evals", "schemas")
     c = sub.add_parser("check")
     m = sub.add_parser("materialize")
     e = sub.add_parser("event")
     for p in (c, m, e):
         p.add_argument("--task", required=True)
-        p.add_argument("--schema", default=default_schema)
+        p.add_argument("--agent", choices=sorted(AGENT_SCHEMAS), default="developer",
+                       help="the task schema to check against, unless --schema names one")
+        p.add_argument("--schema")
     m.add_argument("--product", required=True, help="product checkout at the task's base_sha")
     m.add_argument("--layers", required=True, help="overlay[,reference][,heldout]")
     m.add_argument("--out", required=True)
@@ -192,6 +235,8 @@ def main():
     s.add_argument("--layer", default="api")
     s.add_argument("--out", required=True)
     args = ap.parse_args()
+    if args.cmd != "sandbox" and not args.schema:
+        args.schema = os.path.join(schemas, AGENT_SCHEMAS[args.agent])
     {"check": cmd_check, "materialize": cmd_materialize, "event": cmd_event, "sandbox": cmd_sandbox}[args.cmd](args)
 
 
