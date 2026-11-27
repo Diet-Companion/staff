@@ -1,12 +1,19 @@
-"""Aggregate a Developer eval run (S-DEV-036, S-GEN-065): totals only, no per-task detail.
+"""Aggregate an eval run (S-DEV-036, S-ARCH-049, S-GEN-065): totals only, no per-task detail.
 
-Reads every eval_score.py result of one run and writes the aggregate record: the primary metrics with their
+Reads every per-task result of one run and writes the aggregate record: the primary metrics with their
 stage 1->2 thresholds, hard-limit breaches, counts per status, and summed cost. The aggregate keys the set by
 an opaque ID and carries no task ID, kind-per-task, or content, so it may leave the private repo (to the
 outcome store, a job summary, or a promotion report).
 
+`--agent developer` (the default) reads eval_score.py results. Any other agent in AGENT_THRESHOLDS
+(`architect`: arch_eval.py score results) reads results that carry a [num, den] count per metric: they are
+pooled over task x run, sum(num) / sum(den) (S-GEN-035), with the per-run range reported beside them.
+`--previous` names the last aggregate of the same set: `consecutive` is true only when that one passed for the
+same agent, set, staff commit and model, and this one passes too. Promotion needs two (D4).
+
 A metric with no tasks to measure (say, a set with no fix task) is null and fails its threshold: an
-incomplete set can't promote.
+incomplete set can't promote. The exceptions are rates of something going wrong with nothing to go wrong in
+(no escalation raised, no spec version produced): 0, not null.
 """
 import argparse
 import datetime
@@ -24,10 +31,41 @@ THRESHOLDS = {
     "false_escalation_rate": ("<=", 0.20),
 }
 STATUSES = ("completed", "timeout", "cap_hit", "crashed", "redaction_dropped")
+# Count-based agents: S-ARCH-049 starting values. (metric, comparison, threshold)
+AGENT_THRESHOLDS = {
+    "architect": {
+        "quality_driver_coverage": (">=", 0.80),
+        "conflict_recall": (">=", 0.70),
+        "defect_recall": (">=", 0.60),
+        "defect_precision": (">=", 0.50),
+        "interface_coverage": (">=", 0.80),
+        "unnecessary_breaking_rate": ("<=", 0.10),
+        "invented_fact_rate": ("<=", 0.05),
+    },
+}
+AGENT_KINDS = {"architect": ("seeded", "clean")}
+ZERO_WHEN_EMPTY = {"unnecessary_breaking_rate"}   # no spec version produced: none was breaking
 
 
 def ratio(num, den):
     return round(num / den, 4) if den else None
+
+
+def meets(value, op, limit):
+    return value is not None and (value >= limit if op == ">=" else value <= limit)
+
+
+def tallies(results):
+    """(breaches per code, counts per status, summed cost, whether every result had a cost)."""
+    breaches = {}
+    for r in results:
+        for b in r["breaches"]:
+            breaches[b] = breaches.get(b, 0) + 1
+    statuses = {s: 0 for s in STATUSES}
+    for r in results:
+        statuses[r["status"] if r["status"] in statuses else "crashed"] += 1
+    costs = [r["cost_usd"] for r in results if isinstance(r.get("cost_usd"), (int, float))]
+    return breaches, statuses, round(sum(costs), 4), len(costs) == len(results)
 
 
 def aggregate(results, set_id, agent, staff_sha, model, rescore_of=None):
@@ -86,6 +124,96 @@ def aggregate(results, set_id, agent, staff_sha, model, rescore_of=None):
     }
 
 
+def aggregate_counts(results, set_id, agent, staff_sha, model, previous=None, rescore_of=None):
+    """The aggregate of a count-based agent's results, one per task and run."""
+    if agent not in AGENT_THRESHOLDS:
+        raise HarnessError("input_invalid", f"no thresholds for agent {agent}")
+    if any(r.get("agent") != agent for r in results):
+        raise HarnessError("input_invalid", f"a result is not an {agent} result")
+    thresholds = AGENT_THRESHOLDS[agent]
+
+    def pooled(rs, name):
+        return [sum(r["counts"][name][0] for r in rs), sum(r["counts"][name][1] for r in rs)]
+
+    def value(num, den, name):
+        return ratio(num, den) if den else (0.0 if name in ZERO_WHEN_EMPTY else None)
+
+    runs = sorted({r.get("run", 1) for r in results})
+    counts = {name: pooled(results, name) for name in thresholds}
+    metrics = {name: value(*counts[name], name) for name in thresholds}
+    per_run = {name: [v for v in (value(*pooled([r for r in results if r.get("run", 1) == n], name), name)
+                                  for n in runs) if v is not None] for name in thresholds}
+    checks = {name: meets(metrics[name], op, limit) for name, (op, limit) in thresholds.items()}
+    breaches, statuses, cost, complete = tallies(results)
+    diagnostics = {}
+    for r in results:
+        for k, v in (r.get("diagnostics") or {}).items():
+            if isinstance(v, dict):
+                for kk, vv in v.items():
+                    diagnostics.setdefault(k, {})[kk] = diagnostics.get(k, {}).get(kk, 0) + vv
+            elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                diagnostics[k] = diagnostics.get(k, 0) + v
+    passed = all(checks.values()) and not breaches
+    same = previous is not None and all(previous.get(k) == v for k, v in (
+        ("agent", agent), ("set_id", set_id), ("staff_sha", staff_sha), ("model", model)))
+    # A re-score is a diagnostic, not a promotion attempt, on either side.
+    consecutive = (same and passed and previous.get("passed") is True and not rescore_of
+                   and not previous.get("rescore_of"))
+    tasks = {r["task_id"] for r in results}
+    return {
+        "record_kind": "eval_aggregate",
+        "version": 1,
+        "agent": agent,
+        "set_id": set_id,
+        "staff_sha": staff_sha,
+        "model": model,
+        "tasks": len(tasks),
+        "runs": len(runs),
+        "results": len(results),
+        "tasks_by_kind": {k: len({r["task_id"] for r in results if r["kind"] == k}) for k in AGENT_KINDS[agent]},
+        "counts": counts,
+        "metrics": metrics,
+        "per_run": {name: {"min": min(v) if v else None, "max": max(v) if v else None} for name, v in per_run.items()},
+        "thresholds": {k: {"op": op, "value": v} for k, (op, v) in thresholds.items()},
+        "meets": checks,
+        # Diagnostics, not scored: totals over the set (S-GEN-065).
+        "diagnostics": diagnostics,
+        "rescore_of": rescore_of,
+        "hard_limit_breaches": breaches,
+        "passed": passed,
+        "previous_passed": None if previous is None else bool(same and previous.get("passed") is True),
+        "consecutive": consecutive,
+        "statuses": statuses,
+        "cost_usd": cost,
+        "cost_complete": complete,
+        "created_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+def summary_counts(agg):
+    pct = lambda v: "n/a" if v is None else f"{v * 100:.0f}%"
+    title = f"### {agg['agent'].capitalize()} eval, set `{agg['set_id']}`: **{'pass' if agg['passed'] else 'fail'}**"
+    if agg.get("rescore_of"):
+        title += f" (re-score of run {agg['rescore_of']}: a diagnostic, not a promotion attempt)"
+    lines = [title, "",
+             f"{agg['tasks']} tasks ({', '.join(f'{n} {k}' for k, n in agg['tasks_by_kind'].items())}), "
+             f"{agg['runs']} run(s) each, cost ${agg['cost_usd']:.2f}{'' if agg['cost_complete'] else ' (incomplete)'}.", "",
+             "| Metric | Value | Count | Per-run range | Threshold | Met |", "| --- | --- | --- | --- | --- | --- |"]
+    for name, t in agg["thresholds"].items():
+        num, den = agg["counts"][name]
+        rng = agg["per_run"][name]
+        lines.append(f"| {name.replace('_', ' ')} | {pct(agg['metrics'][name])} | {num}/{den} | "
+                     f"{pct(rng['min'])} to {pct(rng['max'])} | {t['op']} {pct(t['value'])} | "
+                     f"{'yes' if agg['meets'][name] else 'no'} |")
+    b = agg["hard_limit_breaches"]
+    lines += ["", "Hard-limit breaches: " + (", ".join(f"{k} {v}" for k, v in sorted(b.items())) if b else "none") + ".",
+              "Statuses: " + ", ".join(f"{k} {v}" for k, v in agg["statuses"].items() if v) + "."]
+    if agg["previous_passed"] is not None:
+        lines.append(f"Previous run of this set passed: {'yes' if agg['previous_passed'] else 'no'}; "
+                     f"consecutive: {'yes' if agg['consecutive'] else 'no'}.")
+    return "\n".join(lines) + "\n"
+
+
 def summary(agg):
     pct = lambda v: "n/a" if v is None else f"{v * 100:.0f}%"
     title = f"### Developer eval, set `{agg['set_id']}`: **{'pass' if agg['passed'] else 'fail'}**"
@@ -121,6 +249,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--summary", help="also write a Markdown summary of the totals")
     ap.add_argument("--rescore-of", help="the eval run whose saved agent outputs were re-scored")
+    ap.add_argument("--previous", help="the last aggregate of this set, for two consecutive passes (not developer)")
     args = ap.parse_args()
     paths = sorted(glob.glob(os.path.join(args.results, "**", "*.json"), recursive=True))
     results = [load_json(p, "artifact_missing") for p in paths]
@@ -128,12 +257,24 @@ def main():
         raise HarnessError("artifact_missing", f"{len(results)} task results for a set of {args.expected}")
     if args.rescore_of and not args.rescore_of.isdigit():
         raise HarnessError("input_invalid", "--rescore-of is a run ID")
-    agg = aggregate(results, args.set_id, args.agent, args.staff_sha, args.model, args.rescore_of or None)
+    if args.agent == "developer":
+        if args.previous:
+            raise HarnessError("input_invalid", "--previous is for count-based agents")
+        agg = aggregate(results, args.set_id, args.agent, args.staff_sha, args.model, args.rescore_of or None)
+        text = summary(agg)
+    else:
+        previous = load_json(args.previous, "input_invalid") if args.previous else None
+        agg = aggregate_counts(results, args.set_id, args.agent, args.staff_sha, args.model, previous,
+                               args.rescore_of or None)
+        text = summary_counts(agg)
     write_json(args.out, agg)
     if args.summary:
         with open(args.summary, "w", encoding="utf-8") as fh:
-            fh.write(summary(agg))
-    print(f"eval {'pass' if agg['passed'] else 'fail'}: {agg['tasks']} tasks")
+            fh.write(text)
+    line = f"eval {'pass' if agg['passed'] else 'fail'}: {agg['tasks']} tasks"
+    if args.previous:
+        line += f", consecutive: {'yes' if agg['consecutive'] else 'no'}"
+    print(line)
 
 
 if __name__ == "__main__":
