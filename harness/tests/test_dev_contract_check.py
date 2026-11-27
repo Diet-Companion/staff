@@ -11,7 +11,7 @@ import unittest
 
 from helpers import FIXTURES, STAFF, run_cli
 
-from dev_contract_check import MARKER, run_check, summary
+from dev_contract_check import MARKER, run_check, summary, tokens
 
 SCHEMAS = os.path.join(STAFF, "plugins", "staff-engineering", "schemas")
 MAP_SCHEMA = os.path.join(SCHEMAS, "code-map.schema.json")
@@ -199,6 +199,16 @@ class DeclaredTest(ContractCase):
 
 
 class TestedTest(ContractCase):
+    def test_citation_tokens(self):
+        self.assertEqual(tokens("// cites: REQ-010/AC-012, R-012"), {"REQ-010/AC-012", "R-012"})
+        self.assertEqual(tokens('it("cites: REQ-010/AC-012 a halfway total rounds up", () => {'), {"REQ-010/AC-012"})
+        self.assertEqual(tokens('it("cites: REQ-010/AC-013, REQ-015/AC-010 meal totals", () => {'),
+                         {"REQ-010/AC-013", "REQ-015/AC-010"})
+        self.assertEqual(tokens('it("cites: REQ-010/AC-028")'), {"REQ-010/AC-028"})
+        # The list ends at the first piece with more than an ID: later commas are prose.
+        self.assertEqual(tokens('it("cites: REQ-010/AC-019 2000 is green, REQ-010/AC-020 too")'), {"REQ-010/AC-019"})
+        self.assertEqual(tokens("cites:\n"), set())
+
     def test_declared_ac_without_a_citing_test_fails(self):
         # The #154 first draft: ACs declared, only a refactor behind them.
         acs = [{"ac": "REQ-001/AC-001", "part": "full"}, {"ac": "REQ-001/AC-002", "part": "full"}]

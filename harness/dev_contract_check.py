@@ -212,9 +212,18 @@ def check_declared(block, truth, fail):
 
 
 def tokens(text):
+    """The IDs of every `cites: <ID>[, <ID>]` token. The list ends at the first piece that has more than an ID, so a
+    test name such as `it("cites: REQ-010/AC-012 halves round up")` cites REQ-010/AC-012 (S-DEV-016: the token may be
+    in a test's name, its tag or a comment)."""
     out = set()
     for m in CITE_RE.finditer(text):
-        out.update(c.strip().rstrip(".;") for c in m.group(1).split(",") if c.strip())
+        for piece in m.group(1).split(","):
+            words = piece.split()
+            if not words:
+                break
+            out.add(words[0].rstrip(".;\"'`)"))
+            if len(words) > 1:
+                break
     return out
 
 
