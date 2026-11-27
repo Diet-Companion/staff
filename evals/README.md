@@ -43,3 +43,26 @@ set** (S-DEV-036): 10 tasks, 5 feature, 3 fix, 2 trap, written by the seeding ag
 
 Not checked yet: the S-DEV-018 flags a task doesn't expect, and test citations (both hard limits in
 S-DEV-036); the maintainability judge (reported, not gating).
+
+## Architect bundles (S-ARCH-049)
+
+The Architect's promotion set is 10 **design bundles**: 8 seeded with holdout seeds, 2 held-out clean.
+Each is scored by script on its spec keys; promotion needs two consecutive passing runs, one run per bundle.
+
+`schemas/architect-task.schema.json`, checked with `eval_task.py check --agent architect`:
+
+| Field | Seen by the Architect | What it is |
+| --- | --- | --- |
+| `base_sha` | as a plain tree, no history | the pinned product commit (S-GEN-043) |
+| `ticket` | yes | the `arch:design` ticket, authored by an operator |
+| `overlay` | yes | files under `requirements/`, `architecture/` and `knowledge/rules/` only: new ready requirements (1 to 3 of them `type: quality` with crisp targets), and optionally accepted ADRs, components, QAS and interfaces with their specs |
+| `comments` | yes | operator comments on the ticket; none in v1 bundles |
+| `spec` | no | the keys the scorer matches: quality drivers, conflicts, the requirement defect, interface needs and the unknown figure; each plant with its location, the ID it violates and the corrected text (S-GEN-067) |
+| `spec_counts` | no | the spec's entries per key, set by the validity check |
+
+A seeded bundle has 0 to 2 conflicts, at most 1 defect and exactly 1 unknown figure; a clean bundle
+(`spec.clean: true`) has none. Both have 1 to 3 quality drivers.
+
+To run the Architect on a bundle: `eval_task.py materialize --agent architect --layers overlay` builds the
+tree it sees, and `eval_task.py event --agent architect` writes the synthetic `arch:design` event and the
+comment list for `build_input.py --agent architect`.
