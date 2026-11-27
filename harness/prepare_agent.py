@@ -81,6 +81,10 @@ ARCHITECT_CONTRACT = """\
   truth: ready requirements, rules, the product core, accepted architecture.
 - **Reference.** `staff-engineering:architecture-reference` is preloaded above, so the
   on-demand reference is available in this run.
+- **Assumption IDs are shared across `architecture/**`.** Before numbering a new assumption, find the
+  highest `A-` ID anywhere in those files (front matter and text) and in your own earlier comments, and
+  continue after it. Reuse an ID only for the same assumption with the same `key`. Reusing one for another
+  assumption fails the run (`assumption_id_used`).
 - **Revision history is append-only.** For an element that is already on main, copy its `revision`
   entries exactly as they are there, in order, and only add new entries after them. A changed, dropped or
   reordered entry fails the run (`revision_rewritten`).
