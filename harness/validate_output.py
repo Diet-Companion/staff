@@ -381,6 +381,10 @@ def dependency_sets_change(f, base_dir):
     return any(before.get(k) != after.get(k) for k in DEPENDENCY_KEYS)
 
 
+# A path is model text: the detail names it only when it holds plain path characters.
+SAFE_PATH = re.compile(r"^[A-Za-z0-9_./-]{1,200}$")
+
+
 def _module_key(path):
     """A file's directory and name without its extension, lower-cased: what a case-insensitive file
     system and an extensionless import ("./DishForm") both see."""
@@ -400,17 +404,21 @@ def check_case_clash(files, base_dir=None):
             if os.path.isdir(full):
                 for entry in os.listdir(full):
                     if os.path.isfile(os.path.join(full, entry)):
-                        names.setdefault(_module_key(os.path.join(d, entry)), set()).add(
-                            os.path.join(d, entry).split(".", 1)[0])
+                        path = os.path.join(d, entry)
+                        names.setdefault(_module_key(path), {}).setdefault(path.split(".", 1)[0], path)
     for i, f in enumerate(files):
         if f.get("op") == "delete":
             continue
         stem = f["path"].split(".", 1)[0]
-        seen = names.setdefault(_module_key(f["path"]), set())
-        seen.add(stem)
+        seen = names.setdefault(_module_key(f["path"]), {})
+        seen.setdefault(stem, f["path"])
         if len(seen) > 1:
-            raise HarnessError("case_clash", f"/proposed_files/{i}/path differs from another file in its folder "
-                               "only in letter case; rename one")
+            other = next(path for s, path in seen.items() if s != stem)
+            if SAFE_PATH.match(f["path"]) and SAFE_PATH.match(other):
+                clash = f"{f['path']} differs from {other}"
+            else:
+                clash = "differs from another file in its folder"
+            raise HarnessError("case_clash", f"/proposed_files/{i}/path: {clash} only in letter case; rename one")
 
 
 def check_developer(out, expect, base_dir=None):
