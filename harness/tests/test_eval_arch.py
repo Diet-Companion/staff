@@ -72,6 +72,21 @@ class BundleTest(unittest.TestCase):
                 self.check(t)
             self.assertIn("does not fit", cm.exception.detail)
 
+    def test_golden_split(self):
+        sha = "0" * 40
+        for split in ("visible", "hidden"):
+            self.assertEqual(self.check(arch_task("seeded", sha, set="golden", split=split))["split"], split)
+        for bad in (arch_task("seeded", sha, set="golden"),                       # a golden bundle names its side
+                    arch_task("clean", sha, split="hidden"),                      # a promotion bundle has none
+                    arch_task("seeded", sha, set="visible", split="visible")):
+            with self.assertRaises(HarnessError) as cm:
+                self.check(bad)
+            self.assertIn("split", cm.exception.detail)
+        with self.assertRaises(HarnessError):
+            self.check(arch_task("seeded", sha, set="golden", split="holdout"))   # schema: visible or hidden only
+        with self.assertRaises(HarnessError):
+            self.check(task("feature", sha, set="golden"), DEV_SCHEMA)            # the Developer has no golden set
+
     def test_schema_and_path_rules(self):
         sha = "0" * 40
         t = arch_task("seeded", sha)
@@ -104,8 +119,10 @@ class BundleTest(unittest.TestCase):
             dev = json.load(fh)
         self.assertEqual(arch["$defs"]["files"], dev["$defs"]["files"])
         self.assertEqual(strip_descriptions(arch["$defs"]["seeding"]), strip_descriptions(dev["properties"]["seeding"]))
-        for key in ("id", "set", "base_sha"):
+        for key in ("id", "base_sha"):
             self.assertEqual(arch["properties"][key], dev["properties"][key])
+        # The Architect's golden set has its own name (its bundles carry a split); the other names are shared.
+        self.assertEqual(arch["properties"]["set"]["enum"], dev["properties"]["set"]["enum"] + ["golden"])
 
     def test_materialize(self):
         product, sha = product_repo({"impl.txt": "base\n"})

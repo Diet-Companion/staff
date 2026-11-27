@@ -1,13 +1,16 @@
 """Seeding runs for the eval sets (S-GEN-028, S-GEN-067): the request in, the task out.
 
   request   Write the seeding request: the kind and slot, the tickets of the set's stored tasks (so the
-            agent writes something different), and on a retry the refused attempt with its check result.
-            For the Architect, also the slot's `plan`: the exact plant counts (ARCH_SLOT_PLAN).
+            agent writes something different; `--set-dir` may repeat), and on a retry the refused attempt
+            with its check result. For the Architect, also the slot's `plan`: the exact plant counts
+            (ARCH_SLOT_PLAN for the promotion set, ARCH_GOLDEN_PLAN for `--set golden`).
   assemble  Check the seeding agent's envelope (cost, schema, kind) and turn its output into a task file:
-            an opaque ID, the set, the pinned product commit and provenance. The validity check runs next,
-            in a job with no secrets: seed_check.py for the Developer, arch_eval.py check for the Architect.
+            an opaque ID, the set, the pinned product commit and provenance. A golden bundle also gets its
+            slot's split, visible or hidden (S-GEN-037). The validity check runs next, in a job with no
+            secrets: seed_check.py for the Developer, arch_eval.py check for the Architect.
 
-`--agent developer` (the default) or `--agent architect`. Nothing here prints task content.
+`--agent developer` (the default) or `--agent architect`; `--set golden` is the Architect's only. Nothing here
+prints task content.
 """
 import argparse
 import glob
@@ -34,6 +37,26 @@ ARCH_SLOT_PLAN = {
     "clean": [{"quality_drivers": q, "conflicts": 0, "defects": 0, "interface_needs": n, "breaking_needs": 0,
                "unknown_figures": 0} for q, n in zip([2, 1], [1, 0])],
 }
+# The Architect golden set's plants per slot (S-ARCH-049): 16 seeded bundles, 4 clean, and each slot's side of
+# the 70/30 split, stratified by kind (S-GEN-037): seeded 1 to 11 and clean 1 to 3 visible, seeded 12 to 16
+# and clean 4 hidden. The hidden slots alone still plant conflicts, defects, a breaking need and figures, so
+# the hidden-set check of the regression rule (S-GEN-036) measures every metric. Totals: visible 11 conflicts,
+# 7 defects, 8 needs (1 breaking), 25 drivers, 11 figures; hidden 5, 3, 4 (1 breaking), 11, 5. The split
+# never reaches the seeding agent (its request carries the plan only); the bundle stores it, never the slot.
+ARCH_GOLDEN_PLAN = {
+    "seeded": [{"quality_drivers": q, "conflicts": c, "defects": d, "interface_needs": n, "breaking_needs": b,
+                "unknown_figures": 1, "split": "hidden" if slot > 11 else "visible"}
+               for slot, q, c, d, n, b in zip(range(1, 17),
+                                              [1, 2, 1, 3, 2, 1, 2, 1, 3, 2, 1, 2, 1, 3, 1, 2],
+                                              [1, 2, 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 0, 1, 1],
+                                              [1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0],
+                                              [1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0],
+                                              [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0])],
+    "clean": [{"quality_drivers": q, "conflicts": 0, "defects": 0, "interface_needs": n, "breaking_needs": 0,
+               "unknown_figures": 0, "split": "hidden" if slot > 3 else "visible"}
+              for slot, q, n in zip(range(1, 5), [2, 1, 3, 2], [1, 0, 0, 1])],
+}
+ARCH_SLOT_PLANS = {"promotion": ARCH_SLOT_PLAN, "golden": ARCH_GOLDEN_PLAN}
 
 
 def check_kind(agent, kind):
@@ -41,11 +64,21 @@ def check_kind(agent, kind):
         raise HarnessError("input_invalid", f"a {agent} task is one of {', '.join(AGENT_KINDS[agent])}")
 
 
-def slot_plan(kind, slot):
-    plans = ARCH_SLOT_PLAN[kind]
+def check_set(agent, set_):
+    if set_ == "golden" and agent != "architect":
+        raise HarnessError("input_invalid", "the golden set here is the Architect's")
+
+
+def slot_entry(kind, slot, set_="promotion"):
+    plans = ARCH_SLOT_PLANS.get(set_, ARCH_SLOT_PLAN)[kind]
     if not str(slot).isdigit() or not 1 <= int(slot) <= len(plans):
-        raise HarnessError("input_invalid", f"an Architect {kind} slot is 1 to {len(plans)}")
+        raise HarnessError("input_invalid", f"an Architect {set_} {kind} slot is 1 to {len(plans)}")
     return plans[int(slot) - 1]
+
+
+def slot_plan(kind, slot, set_="promotion"):
+    """The slot's exact plant counts, for the seeding agent and the validity check. Never the split."""
+    return {k: v for k, v in slot_entry(kind, slot, set_).items() if k != "split"}
 
 
 def opaque_id():
@@ -54,14 +87,15 @@ def opaque_id():
 
 def cmd_request(args):
     check_kind(args.agent, args.kind)
+    check_set(args.agent, args.set)
     existing = []
-    for path in sorted(glob.glob(os.path.join(args.set_dir, "*.json"))):
+    for path in sorted(p for d in args.set_dir for p in glob.glob(os.path.join(d, "*.json"))):
         t = load_json(path, "input_invalid")
         existing.append({"kind": t.get("kind"), "title": (t.get("ticket") or {}).get("title"),
                          "summary": t.get("summary")})
     req = {"kind": args.kind, "slot": args.slot, "set": args.set, "existing": existing}
     if args.agent == "architect":
-        req["plan"] = slot_plan(args.kind, args.slot)
+        req["plan"] = slot_plan(args.kind, args.slot, args.set)
     if args.previous_task and os.path.exists(args.previous_task):
         prev = load_json(args.previous_task, "input_invalid")
         check = load_json(args.previous_check, "input_invalid") if args.previous_check and os.path.exists(args.previous_check) else {}
@@ -72,16 +106,24 @@ def cmd_request(args):
 
 
 def architect_task(out, args):
-    return {"version": 1, "id": opaque_id(), "agent": "architect", "set": args.set, "kind": out["kind"],
+    task = {"version": 1, "id": opaque_id(), "agent": "architect", "set": args.set, "kind": out["kind"],
             "base_sha": args.base_sha,
             "seeding": {"run_id": args.run_id, "staff_sha": args.staff_sha, "model": args.model,
                         "holdout_seed": args.set == "promotion" and out["kind"] == "seeded"},
             "summary": out["summary"], "ticket": out["ticket"], "overlay": out["overlay"], "comments": [],
             "spec": out["spec"]}
+    if args.set == "golden":
+        task["split"] = args.split   # golden bundles are never holdout seeds (S-GEN-038)
+    return task
 
 
 def cmd_assemble(args):
     check_kind(args.agent, args.kind)
+    check_set(args.agent, args.set)
+    if args.set == "golden":
+        if args.slot is None:
+            raise HarnessError("input_invalid", "a golden bundle needs --slot, for its split")
+        args.split = slot_entry(args.kind, args.slot, args.set)["split"]
     result = {"ok": False, "reason": None}
     try:
         env = load_json(args.envelope, "envelope_invalid")
@@ -125,8 +167,9 @@ def main():
     r = sub.add_parser("request")
     r.add_argument("--kind", required=True, help="feature, fix or trap; seeded or clean (AGENT_KINDS)")
     r.add_argument("--slot", required=True)
-    r.add_argument("--set", required=True, choices=["visible", "hidden", "promotion"])
-    r.add_argument("--set-dir", required=True, help="the set's stored task files")
+    r.add_argument("--set", required=True, choices=["visible", "hidden", "promotion", "golden"])
+    r.add_argument("--set-dir", required=True, action="append",
+                   help="a directory of the set's stored task files; repeat for more than one")
     r.add_argument("--previous-task")
     r.add_argument("--previous-check")
     r.add_argument("--out", required=True)
@@ -136,7 +179,8 @@ def main():
     a.add_argument("--task-schema", help="default: the agent's task schema")
     a.add_argument("--max-run-usd", type=float, required=True)
     a.add_argument("--kind", required=True, help="feature, fix or trap; seeded or clean (AGENT_KINDS)")
-    a.add_argument("--set", required=True, choices=["visible", "hidden", "promotion"])
+    a.add_argument("--set", required=True, choices=["visible", "hidden", "promotion", "golden"])
+    a.add_argument("--slot", help="the slot seeded; required for --set golden, whose slot sets the split")
     a.add_argument("--base-sha", required=True)
     a.add_argument("--run-id", required=True)
     a.add_argument("--staff-sha", required=True)

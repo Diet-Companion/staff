@@ -88,10 +88,13 @@ def load_task(path, schema_path):
 
 def check_architect_task(task):
     """Kind and path rules of an Architect bundle (S-ARCH-049): both kinds have 1 to 3 quality drivers; a
-    seeded bundle has 0 to 2 conflicts, at most 1 defect and exactly 1 unknown figure; a clean one none."""
+    seeded bundle has 0 to 2 conflicts, at most 1 defect and exactly 1 unknown figure; a clean one none. A golden
+    bundle names its split (visible or hidden, S-GEN-037); no other bundle has one."""
     spec, kind = task["spec"], task["kind"]
     if task["ticket"]["label"] != "arch:design":
         raise HarnessError("input_invalid", "an Architect bundle needs the arch:design label")
+    if (task["set"] == "golden") != ("split" in task):
+        raise HarnessError("input_invalid", "a golden bundle, and only a golden bundle, has a split")
     plants = len(spec["conflicts"]) + len(spec["defects"]) + len(spec["unknown_figures"])
     rules = {
         "seeded": not spec["clean"] and len(spec["unknown_figures"]) == 1,

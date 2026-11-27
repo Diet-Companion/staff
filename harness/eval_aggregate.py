@@ -11,6 +11,16 @@ pooled over task x run, sum(num) / sum(den) (S-GEN-035), with the per-run range 
 `--previous` names the last aggregate of the same set: `consecutive` is true only when that one passed for the
 same agent, set, staff commit and model, and this one passes too. Promotion needs two (D4).
 
+Golden results carry a `split`, visible or hidden (S-GEN-037): the aggregate then also holds the pooled
+totals per split (`by_split`). `--baseline` names an earlier golden aggregate of the agent, and `regression`
+applies the S-GEN-036 rule to each primary metric, on visible and hidden combined:
+  regression                 more than 5 points worse than the baseline, or the per-run range entirely worse
+                             than the baseline's (when both sides have 2 or more runs; one run has no range)
+  improvement                more than 5 points better, and the hidden set alone doesn't regress
+  no detectable difference   otherwise; `n/a` when either side has no value
+"Worse" follows the threshold's direction: lower is better for the `<=` rates. A gain of more than 5 points
+on the visible set while the hidden set gains no more than 5 is flagged as possible overfitting.
+
 A metric with no tasks to measure (say, a set with no fix task) is null and fails its threshold: an
 incomplete set can't promote. The exceptions are rates of something going wrong with nothing to go wrong in
 (no escalation raised, no spec version produced): 0, not null.
@@ -46,6 +56,10 @@ AGENT_THRESHOLDS = {
 AGENT_KINDS = {"architect": ("seeded", "clean")}
 ZERO_WHEN_EMPTY = {"unnecessary_breaking_rate"}   # no spec version produced: none was breaking
 
+# Golden sets (S-GEN-037, S-GEN-036): the two sides of the split, and the regression rule's margin.
+SPLITS = ("visible", "hidden")
+MARGIN_POINTS = 5   # "more than 5 percentage points"
+
 
 def ratio(num, den):
     return round(num / den, 4) if den else None
@@ -53,6 +67,93 @@ def ratio(num, den):
 
 def meets(value, op, limit):
     return value is not None and (value >= limit if op == ">=" else value <= limit)
+
+
+def pool(results, name):
+    return [sum(r["counts"][name][0] for r in results), sum(r["counts"][name][1] for r in results)]
+
+
+def pooled_value(num, den, name):
+    return ratio(num, den) if den else (0.0 if name in ZERO_WHEN_EMPTY else None)
+
+
+def totals(results, agent):
+    """The pooled counts, values and per-run range of each primary metric over these results (S-GEN-035)."""
+    names = AGENT_THRESHOLDS[agent]
+    runs = sorted({r.get("run", 1) for r in results})
+    counts = {name: pool(results, name) for name in names}
+    per_run = {name: [v for v in (pooled_value(*pool([r for r in results if r.get("run", 1) == n], name), name)
+                                  for n in runs) if v is not None] for name in names}
+    return {
+        "tasks": len({r["task_id"] for r in results}),
+        "runs": len(runs),
+        "results": len(results),
+        "tasks_by_kind": {k: len({r["task_id"] for r in results if r["kind"] == k}) for k in AGENT_KINDS[agent]},
+        "counts": counts,
+        "metrics": {name: pooled_value(*counts[name], name) for name in names},
+        "per_run": {name: {"min": min(v) if v else None, "max": max(v) if v else None} for name, v in per_run.items()},
+    }
+
+
+def splits_of(results):
+    """The golden splits these results carry: none for a promotion set, else visible and/or hidden."""
+    found = {r.get("split") for r in results}
+    if found == {None}:
+        return ()
+    if None in found or not found <= set(SPLITS):
+        raise HarnessError("input_invalid", "every golden result has a split, visible or hidden")
+    return tuple(s for s in SPLITS if s in found)
+
+
+def change(new, base, name, op):
+    """One metric of one side (combined or a split) against the baseline: the change in points, signed so that
+    positive is better, and whether it regressed or got better by the S-GEN-036 margins."""
+    v1, v0 = new["metrics"][name], base["metrics"][name]
+    if v1 is None or v0 is None:
+        return {"baseline": v0, "new": v1, "points": None, "regressed": False, "better": False}
+    sign = 1 if op == ">=" else -1
+    points = round(sign * (v1 - v0) * 100, 2)
+    r1, r0 = new["per_run"][name], base["per_run"][name]
+    ranged = new.get("runs", 1) >= 2 and base.get("runs", 1) >= 2 and None not in (r1["min"], r1["max"], r0["min"], r0["max"])
+    below = ranged and (r1["max"] < r0["min"] if op == ">=" else r1["min"] > r0["max"])
+    return {"baseline": v0, "new": v1, "points": points, "regressed": points < -MARGIN_POINTS or below,
+            "better": points > MARGIN_POINTS}
+
+
+def compare(agg, baseline):
+    """The S-GEN-036 regression rule of a golden aggregate against an earlier one of the same agent."""
+    if baseline.get("agent") != agg["agent"] or "by_split" not in baseline or "by_split" not in agg:
+        raise HarnessError("input_invalid", "the baseline and this run are not golden aggregates of one agent")
+    if not baseline.get("valid", True):
+        raise HarnessError("input_invalid", "the baseline run is invalid")
+    if "hidden" not in agg["by_split"] or "hidden" not in baseline["by_split"]:
+        raise HarnessError("input_invalid", "the regression rule needs hidden results on both sides")
+    metrics = {}
+    for name, (op, _) in AGENT_THRESHOLDS[agg["agent"]].items():
+        combined = change(agg, baseline, name, op)
+        hidden = change(agg["by_split"]["hidden"], baseline["by_split"]["hidden"], name, op)
+        visible = (change(agg["by_split"]["visible"], baseline["by_split"]["visible"], name, op)
+                   if "visible" in agg["by_split"] and "visible" in baseline["by_split"] else None)
+        if combined["points"] is None:
+            verdict = "n/a"
+        elif combined["regressed"]:
+            verdict = "regression"
+        elif combined["better"] and not hidden["regressed"]:
+            verdict = "improvement"
+        else:
+            verdict = "no detectable difference"
+        metrics[name] = {"verdict": verdict, "combined": combined, "hidden": hidden, "visible": visible,
+                         "possible_overfitting": bool(visible and visible["better"] and not hidden["better"])}
+    verdicts = {m["verdict"] for m in metrics.values()}
+    overall = ("invalid" if not agg.get("valid", True) else "regression" if "regression" in verdicts
+               else "improvement" if "improvement" in verdicts else "no detectable difference")
+    return {
+        "verdict": overall,
+        "possible_overfitting": sorted(n for n, m in metrics.items() if m["possible_overfitting"]),
+        "baseline": {k: baseline.get(k) for k in ("set_id", "staff_sha", "model", "created_at")},
+        "same_set": baseline.get("set_id") == agg["set_id"],
+        "metrics": metrics,
+    }
 
 
 def infra_failures(results):
@@ -139,6 +240,7 @@ def aggregate_counts(results, set_id, agent, staff_sha, model, previous=None, re
     if any(r.get("agent") != agent for r in results):
         raise HarnessError("input_invalid", f"a result is not an {agent} result")
     thresholds = AGENT_THRESHOLDS[agent]
+    splits = splits_of(results)
 
     def pooled(rs, name):
         return [sum(r["counts"][name][0] for r in rs), sum(r["counts"][name][1] for r in rs)]
@@ -169,7 +271,7 @@ def aggregate_counts(results, set_id, agent, staff_sha, model, previous=None, re
     consecutive = (same and passed and previous.get("passed") is True and not rescore_of
                    and not previous.get("rescore_of"))
     tasks = {r["task_id"] for r in results}
-    return {
+    agg = {
         "record_kind": "eval_aggregate",
         "version": 1,
         "agent": agent,
@@ -199,6 +301,10 @@ def aggregate_counts(results, set_id, agent, staff_sha, model, previous=None, re
         "cost_complete": complete,
         "created_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+    if splits:
+        # Golden set: the same totals per split, for the regression rule's hidden-set check (S-GEN-036).
+        agg["by_split"] = {s: totals([r for r in results if r["split"] == s], agent) for s in splits}
+    return agg
 
 
 def verdict(agg):
@@ -232,7 +338,48 @@ def summary_counts(agg):
     if agg["previous_passed"] is not None:
         lines.append(f"Previous run of this set passed: {'yes' if agg['previous_passed'] else 'no'}; "
                      f"consecutive: {'yes' if agg['consecutive'] else 'no'}.")
+    lines += split_lines(agg) + regression_lines(agg)
     return "\n".join(lines) + "\n"
+
+
+def split_lines(agg):
+    by = agg.get("by_split")
+    if not by:
+        return []
+    pct = lambda v: "n/a" if v is None else f"{v * 100:.0f}%"
+    sides = [s for s in SPLITS if s in by]
+    desc = "; ".join(f"{s} {by[s]['tasks']} ({', '.join(f'{n} {k}' for k, n in by[s]['tasks_by_kind'].items())})"
+                     for s in sides)
+    lines = ["", f"Per split (S-GEN-037): {desc}.", "",
+             "| Metric | " + " | ".join(s.capitalize() for s in sides) + " |", "| --- |" + " --- |" * len(sides)]
+    for name in agg["thresholds"]:
+        cells = [f"{pct(by[s]['metrics'][name])} ({by[s]['counts'][name][0]}/{by[s]['counts'][name][1]})" for s in sides]
+        lines.append(f"| {name.replace('_', ' ')} | " + " | ".join(cells) + " |")
+    return lines
+
+
+def regression_lines(agg):
+    reg = agg.get("regression")
+    if not reg:
+        return []
+    pct = lambda v: "n/a" if v is None else f"{v * 100:.0f}%"
+    pts = lambda c: "n/a" if c is None or c["points"] is None else f"{c['points']:+.1f} pts"
+    base = reg["baseline"]
+    lines = ["", f"Regression rule against baseline `{base['set_id']}` at staff `{str(base['staff_sha'])[:7]}` "
+             f"(S-GEN-036, visible and hidden combined): **{reg['verdict']}**."]
+    if not reg["same_set"]:
+        lines.append("The baseline ran on another set (a rotation or rebuild changed it): read the change with care.")
+    lines += ["", "| Metric | Baseline | New | Change | Hidden alone | Visible alone | Verdict |",
+              "| --- | --- | --- | --- | --- | --- | --- |"]
+    for name, m in reg["metrics"].items():
+        c = m["combined"]
+        lines.append(f"| {name.replace('_', ' ')} | {pct(c['baseline'])} | {pct(c['new'])} | {pts(c)} | "
+                     f"{pts(m['hidden'])} | {pts(m['visible'])} | {m['verdict']} |")
+    if reg["possible_overfitting"]:
+        lines.append("")
+        lines.append("Possible overfitting: " + ", ".join(n.replace("_", " ") for n in reg["possible_overfitting"])
+                     + " gained more than 5 points on the visible set alone.")
+    return lines
 
 
 def summary(agg):
@@ -271,6 +418,8 @@ def main():
     ap.add_argument("--summary", help="also write a Markdown summary of the totals")
     ap.add_argument("--rescore-of", help="the eval run whose saved agent outputs were re-scored")
     ap.add_argument("--previous", help="the last aggregate of this set, for two consecutive passes (not developer)")
+    ap.add_argument("--baseline", help="an earlier golden aggregate of this agent, for the S-GEN-036 regression rule "
+                                       "(not developer)")
     args = ap.parse_args()
     paths = sorted(glob.glob(os.path.join(args.results, "**", "*.json"), recursive=True))
     results = [load_json(p, "artifact_missing") for p in paths]
@@ -279,14 +428,16 @@ def main():
     if args.rescore_of and not args.rescore_of.isdigit():
         raise HarnessError("input_invalid", "--rescore-of is a run ID")
     if args.agent == "developer":
-        if args.previous:
-            raise HarnessError("input_invalid", "--previous is for count-based agents")
+        if args.previous or args.baseline:
+            raise HarnessError("input_invalid", "--previous and --baseline are for count-based agents")
         agg = aggregate(results, args.set_id, args.agent, args.staff_sha, args.model, args.rescore_of or None)
         text = summary(agg)
     else:
         previous = load_json(args.previous, "input_invalid") if args.previous else None
         agg = aggregate_counts(results, args.set_id, args.agent, args.staff_sha, args.model, previous,
                                args.rescore_of or None)
+        if args.baseline:
+            agg["regression"] = compare(agg, load_json(args.baseline, "input_invalid"))
         text = summary_counts(agg)
     write_json(args.out, agg)
     if args.summary:
@@ -295,6 +446,8 @@ def main():
     line = f"eval {verdict(agg)}: {agg['tasks']} tasks"
     if args.previous:
         line += f", consecutive: {'yes' if agg['consecutive'] else 'no'}"
+    if args.baseline:
+        line += f", regression rule: {agg['regression']['verdict']}"
     print(line)
 
 

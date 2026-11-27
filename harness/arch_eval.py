@@ -49,8 +49,9 @@ the latest approved or deprecated version's on the view, else `compatible`.
 
 Hard limits (breaches): invalid_output (the run's output failed a harness check), adr_options_out_of_range,
 human_owned_field_set (the full S-ARCH-020 list against the view, D5), write_outside_scope. A run that stopped
-without validated output scores zero, as for the Developer. The result holds per-bundle detail, so it stays in
-the private repo. Nothing here prints output or bundle content.
+without validated output scores zero, as for the Developer. A golden bundle's result carries its `split`
+(visible or hidden, S-GEN-037). The result holds per-bundle detail, so it stays in the private repo. Nothing
+here prints output or bundle content.
 """
 import argparse
 import json
@@ -285,6 +286,8 @@ def score(task, record, validated, validation, truth, areas, run=1):
                    "invented_fact_rate": [len(figures), len(figures)]},
         "breaches": [], "diagnostics": {},
     }
+    if "split" in task:
+        result["split"] = task["split"]   # a golden bundle's side, for the per-split totals (S-GEN-036)
     if not ok:
         if result["reason"] in OUTPUT_REASONS:
             result["breaches"].append("invalid_output")

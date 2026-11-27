@@ -10,7 +10,7 @@ import yaml
 from helpers import STAFF, run_cli
 from arch_eval import check_bundle
 from prepare_agent import CONTRACTS
-from seed_task import ARCH_SLOT_PLAN
+from seed_task import ARCH_GOLDEN_PLAN, ARCH_SLOT_PLAN, slot_plan
 from test_eval import product_repo, write
 from test_ready_gate import RULE, requirement
 
@@ -111,6 +111,9 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(t["spec_counts"], {"quality_drivers": 1, "conflicts": 1, "defects": 1, "interface_needs": 1,
                                             "unknown_figures": 1})
         self.assertEqual(self.codes(bundle("clean"), ARCH_SLOT_PLAN["clean"][1] | {"interface_needs": 1}), [])
+        golden = bundle(set="golden", split="visible")
+        self.assertEqual(self.codes(golden, slot_plan("seeded", "1", "golden")), [])     # the split isn't a plant
+        self.assertEqual(self.codes(golden, slot_plan("seeded", "3", "golden")), ["plan_mismatch"])
 
     def test_requirements(self):
         draft = self.codes(bundle(overlay=overlay([story(status="draft"), quality()])))
@@ -219,14 +222,14 @@ class SeedTest(unittest.TestCase):
         return {"schema_version": 1, "agent": "seeder-architect", "kind": kind, "summary": "s",
                 **{k: t[k] for k in ("ticket", "overlay", "spec")}}
 
-    def assemble(self, out, kind="seeded", agent="architect", set_="promotion"):
+    def assemble(self, out, kind="seeded", agent="architect", set_="promotion", extra=()):
         d = tempfile.mkdtemp()
         env = {"type": "result", "subtype": "success", "is_error": False, "total_cost_usd": 1.0, "num_turns": 9,
                "structured_output": out}
         res = run_cli("seed_task.py", "assemble", "--agent", agent, "--envelope", write(d, "env.json", env),
                       "--max-run-usd", "6", "--kind", kind, "--set", set_, "--base-sha", "a" * 40, "--run-id", "1-1",
                       "--staff-sha", "b" * 40, "--model", "m", "--out", os.path.join(d, "task.json"),
-                      "--result", os.path.join(d, "result.json"))
+                      "--result", os.path.join(d, "result.json"), *extra)
         if not os.path.exists(os.path.join(d, "result.json")):
             return {"reason": "input_invalid" if "input_invalid" in res.stderr else None}, None
         with open(os.path.join(d, "result.json")) as fh:
@@ -247,6 +250,74 @@ class SeedTest(unittest.TestCase):
         self.assertEqual({p["unknown_figures"] for p in seeded}, {1})
         self.assertEqual([(p["quality_drivers"], p["interface_needs"], p["conflicts"] + p["defects"] + p["unknown_figures"])
                           for p in clean], [(2, 1, 0), (1, 0, 0)])
+
+    def test_golden_plan(self):
+        seeded, clean = ARCH_GOLDEN_PLAN["seeded"], ARCH_GOLDEN_PLAN["clean"]
+        side = lambda plans, split: [p for p in plans if p["split"] == split]
+        total = lambda plans, key: sum(p[key] for p in plans)
+        # 70/30 by kind, and each kind with 2 or more bundles has a hidden one (S-GEN-037).
+        self.assertEqual([len(side(seeded, "visible")), len(side(seeded, "hidden")),
+                          len(side(clean, "visible")), len(side(clean, "hidden"))], [11, 5, 3, 1])
+        self.assertEqual({k: total(seeded, k) for k in ("conflicts", "defects", "interface_needs", "breaking_needs",
+                                                        "unknown_figures")},
+                         {"conflicts": 16, "defects": 10, "interface_needs": 10, "breaking_needs": 2, "unknown_figures": 16})
+        self.assertEqual((total(clean, "interface_needs"), sum(p["interface_needs"] > 0 for p in clean)), (2, 2))
+        for p in seeded:                                                # S-ARCH-049's seeded bundle
+            self.assertTrue(p["conflicts"] <= 2 and p["defects"] <= 1 and p["unknown_figures"] == 1, p)
+            self.assertTrue(1 <= p["quality_drivers"] <= 3 and p["breaking_needs"] <= p["interface_needs"] <= 1, p)
+        for p in clean:
+            self.assertEqual((p["conflicts"], p["defects"], p["unknown_figures"], p["breaking_needs"]), (0, 0, 0, 0))
+            self.assertTrue(1 <= p["quality_drivers"] <= 3)
+        hidden = side(seeded, "hidden") + side(clean, "hidden")        # the hidden set alone measures every metric
+        for key in ("quality_drivers", "conflicts", "defects", "interface_needs", "breaking_needs", "unknown_figures"):
+            self.assertGreater(total(hidden, key), 0, key)
+        self.assertLess(total(hidden, "breaking_needs"), total(hidden, "interface_needs"))   # and a compatible need
+        self.assertEqual(set(slot_plan("seeded", "12", "golden")), set(ARCH_SLOT_PLAN["seeded"][0]))   # no split
+
+    def test_golden_assemble(self):
+        cases = ((self.output(), "seeded", "1", "visible"), (self.output(), "seeded", "12", "hidden"),
+                 (self.output("clean"), "clean", "3", "visible"), (self.output("clean"), "clean", "4", "hidden"))
+        for out, kind, slot, split in cases:
+            result, t = self.assemble(out, kind=kind, set_="golden", extra=("--slot", slot))
+            self.assertTrue(result["ok"], result)
+            self.assertEqual((t["set"], t["split"], t["seeding"]["holdout_seed"]), ("golden", split, False))
+            self.assertNotIn("slot", json.dumps(t))
+        _, t = self.assemble(self.output(), extra=("--slot", "12"))                  # promotion: no split
+        self.assertNotIn("split", t)
+        self.assertEqual(self.assemble(self.output(), set_="golden")[0]["reason"], "input_invalid")   # no slot
+        for slot in ("17", "0", "x"):
+            self.assertEqual(self.assemble(self.output(), set_="golden", extra=("--slot", slot))[0]["reason"],
+                             "input_invalid", slot)
+        self.assertEqual(self.assemble(self.output("clean"), kind="clean", set_="golden",
+                                       extra=("--slot", "5"))[0]["reason"], "input_invalid")
+        self.assertEqual(self.assemble(self.output(), agent="developer", kind="trap", set_="golden",
+                                       extra=("--slot", "1"))[0]["reason"], "input_invalid")
+
+    def test_golden_request(self):
+        d = tempfile.mkdtemp()
+        for name, kind in (("hidden", "seeded"), ("visible", "clean"), ("promotion", "seeded")):
+            os.makedirs(os.path.join(d, name))
+            write(os.path.join(d, name), "x.json", dict(bundle(kind), summary=name))
+        out = os.path.join(d, "req.json")
+        base = ["seed_task.py", "request", "--agent", "architect", "--set", "golden", "--out", out,
+                *(x for name in ("hidden", "visible", "promotion") for x in ("--set-dir", os.path.join(d, name)))]
+        res = run_cli(*base, "--kind", "seeded", "--slot", "12")
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn("3 existing", res.stdout)                         # every --set-dir is read
+        with open(out) as fh:
+            req = json.load(fh)
+        self.assertEqual((req["set"], req["plan"]), ("golden", slot_plan("seeded", "12", "golden")))
+        self.assertEqual(sorted(e["summary"] for e in req["existing"]), ["hidden", "promotion", "visible"])
+        self.assertNotIn("split", json.dumps(req["plan"]))                # the seeding agent never sees the split
+        res = run_cli(*base, "--kind", "clean", "--slot", "4")
+        self.assertEqual(res.returncode, 0, res.stderr)
+        with open(out) as fh:
+            self.assertEqual(json.load(fh)["plan"], slot_plan("clean", "4", "golden"))
+        for kind, slot in (("seeded", "17"), ("clean", "5")):
+            self.assertIn("input_invalid", run_cli(*base, "--kind", kind, "--slot", slot).stderr, (kind, slot))
+        res = run_cli("seed_task.py", "request", "--kind", "trap", "--slot", "1", "--set", "golden",
+                      "--set-dir", os.path.join(d, "hidden"), "--out", out)
+        self.assertIn("input_invalid", res.stderr)                      # the golden set here is the Architect's
 
     def test_assemble(self):
         result, t = self.assemble(self.output())
