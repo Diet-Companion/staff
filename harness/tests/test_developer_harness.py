@@ -596,10 +596,12 @@ class CaseClashTest(unittest.TestCase):
         with self.assertRaises(HarnessError) as ctx:
             check_case_clash(clash)
         self.assertEqual(ctx.exception.reason, "case_clash")
+        self.assertIn("client/src/DishForm.tsx differs from client/src/dishForm.ts", str(ctx.exception))
         d = tempfile.mkdtemp()
         os.makedirs(os.path.join(d, "client", "src"))
         open(os.path.join(d, "client", "src", "flow.ts"), "w").close()
         check_case_clash([{"path": "client/src/flow.ts", "op": "modify"}], d)  # the same file is no clash
-        with self.assertRaises(HarnessError):
+        with self.assertRaises(HarnessError) as ctx:
             check_case_clash([{"path": "client/src/Flow.tsx", "op": "add"}], d)  # clashes with flow.ts on main
+        self.assertIn("differs from client/src/flow.ts", str(ctx.exception))
 
