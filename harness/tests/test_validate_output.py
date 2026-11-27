@@ -75,6 +75,10 @@ class ValidateTest(unittest.TestCase):
         self.assertReason("max_turns", check_run, envelope(subtype="error_max_turns", is_error=True), 3.0)
         self.assertReason("budget_exceeded", check_run, envelope(subtype="error_max_budget_usd", is_error=True), 3.0)
         self.assertReason("model_error", check_run, envelope(is_error=True), 3.0)
+        spent = envelope(is_error=True, total_cost_usd=0, num_turns=1,
+                         result="You've hit your 5-hour limit · resets 6:10pm (UTC)")
+        self.assertReason("usage_limit", check_run, spent, 3.0)  # the account ran out: no agent output to judge
+        self.assertReason("model_error", check_run, dict(spent, total_cost_usd=0.2), 3.0)  # model text: never read
         self.assertReason("envelope_invalid", check_run, {"type": "assistant"}, 3.0)
 
     def test_prose_or_missing_output(self):
