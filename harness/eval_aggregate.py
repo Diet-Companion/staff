@@ -54,6 +54,8 @@ AGENT_THRESHOLDS = {
     },
 }
 AGENT_KINDS = {"architect": ("seeded", "clean")}
+# Metrics scored and reported but not gated: no threshold yet (operator decision, 2026-11-27).
+AGENT_REPORTED = {"architect": ("unrecorded_figure_rate",)}
 ZERO_WHEN_EMPTY = {"unnecessary_breaking_rate"}   # no spec version produced: none was breaking
 
 # Golden sets (S-GEN-037, S-GEN-036): the two sides of the split, and the regression rule's margin.
@@ -254,6 +256,7 @@ def aggregate_counts(results, set_id, agent, staff_sha, model, previous=None, re
     per_run = {name: [v for v in (value(*pooled([r for r in results if r.get("run", 1) == n], name), name)
                                   for n in runs) if v is not None] for name in thresholds}
     checks = {name: meets(metrics[name], op, limit) for name, (op, limit) in thresholds.items()}
+    reported = {name: pooled([r for r in results if name in r["counts"]], name) for name in AGENT_REPORTED.get(agent, ())}
     breaches, statuses, cost, complete = tallies(results)
     diagnostics = {}
     for r in results:
@@ -287,6 +290,7 @@ def aggregate_counts(results, set_id, agent, staff_sha, model, previous=None, re
         "per_run": {name: {"min": min(v) if v else None, "max": max(v) if v else None} for name, v in per_run.items()},
         "thresholds": {k: {"op": op, "value": v} for k, (op, v) in thresholds.items()},
         "meets": checks,
+        "reported": {name: {"count": c, "value": value(*c, name)} for name, c in reported.items()},
         # Diagnostics, not scored: totals over the set (S-GEN-065).
         "diagnostics": diagnostics,
         "rescore_of": rescore_of,
@@ -332,6 +336,9 @@ def summary_counts(agg):
         lines.append(f"| {name.replace('_', ' ')} | {pct(agg['metrics'][name])} | {num}/{den} | "
                      f"{pct(rng['min'])} to {pct(rng['max'])} | {t['op']} {pct(t['value'])} | "
                      f"{'yes' if agg['meets'][name] else 'no'} |")
+    for name, r in (agg.get("reported") or {}).items():
+        lines.append(f"| {name.replace('_', ' ')} | {pct(r['value'])} | {r['count'][0]}/{r['count'][1]} | | "
+                     "reported, not gated | |")
     b = agg["hard_limit_breaches"]
     lines += ["", "Hard-limit breaches: " + (", ".join(f"{k} {v}" for k, v in sorted(b.items())) if b else "none") + ".",
               "Statuses: " + ", ".join(f"{k} {v}" for k, v in agg["statuses"].items() if v) + "."]
