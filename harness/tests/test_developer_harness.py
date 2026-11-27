@@ -470,6 +470,20 @@ class RenderTest(unittest.TestCase):
         self.assertIn("failed the harness's shape check", main)
         self.assertNotIn("### Approved", main)
 
+    def test_turn_limit_warning(self):
+        class Stage2(Args):
+            stage, issue = 2, 41
+        out = load("developer-feature.json")
+        self.assertNotIn("Turn limit reached", render_pr_body(out, META, APPLIED, None, Stage2))
+        out["turn_limit_reached"] = {"num_turns": 40, "max_turns": 40}
+        body = render_pr_body(out, META, APPLIED, None, Stage2)
+        self.assertIn("used 40 of 40 turns", body)
+        self.assertLess(body.index("Decide first"), body.index("Turn limit reached"))
+        self.assertLess(body.index("Turn limit reached"), body.index("Proposed change"))
+        self.assertIn("used 40 of 40 turns", dict(render(out, META, APPLIED, None, Args, {})[0])["00-main.md"])
+        out["turn_limit_reached"] = {"num_turns": "40\n### Approved", "max_turns": 40}
+        self.assertNotIn("Turn limit reached", render_pr_body(out, META, APPLIED, None, Stage2))
+
     def test_failure_tail_is_fenced(self):
         sandbox = {"setup": ["npm ci"], "build": ["npm run typecheck"], "unit_test": "npm test", "unit_report": "r.xml"}
         result = {"version": 1, "status": "fail", "build": {"base": False, "head": False}, "report": {"head": False},

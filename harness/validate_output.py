@@ -39,6 +39,15 @@ def metrics(env):
     }
 
 
+def turn_limit(env):
+    """{num_turns, max_turns} when the run used every turn MAX_TURNS allows, else None. Such a run can end with an
+    output that was cut short: fewer files than its summary describes. It is a warning, never a failure."""
+    turns, limit = env.get("num_turns"), os.environ.get("MAX_TURNS", "")
+    if not isinstance(turns, int) or isinstance(turns, bool) or not limit.isdigit() or int(limit) < 1:
+        return None
+    return {"num_turns": turns, "max_turns": int(limit)} if turns >= int(limit) else None
+
+
 def check_run(env, max_usd):
     if not isinstance(env, dict) or env.get("type") != "result":
         raise HarnessError("envelope_invalid", "not a claude -p result envelope")
@@ -714,6 +723,10 @@ def main():
         # The repo is public: private reports never reach an artifact or a comment (S-DEV-019).
         out["private_reports_withheld"] = [{"id": r["id"], "kind": r["kind"]} for r in out["private_reports"]]
         out["private_reports"] = []
+        limit = turn_limit(env)
+        if limit:
+            out["turn_limit_reached"] = limit
+            result["turn_limit_reached"] = True
         outcome = "proposed" if out["pr"] else "code_map" if out["code_map"] else "no_code"
         result.update(ok=True, outcome=outcome)
         summary = (f"outcome={outcome}, {len(out['proposed_files'])} files, {len(out['questions'])} questions, "

@@ -131,7 +131,7 @@ def render_main(data, meta, applied, sandbox, args):
     out = [f"### Developer (stage {args.stage}): {TITLES[outcome(data)]}", "",
            f"Ticket kind: {esc(meta['ticket_kind'])} ({esc(meta['work'])}) · Area: {esc(meta['area'] or 'none')}"
            f" · Readiness: {esc(r['status'])}", "",
-           "#### Decide first", "", quote(data["decision_summary"]), ""]
+           "#### Decide first", "", quote(data["decision_summary"]), ""] + turn_limit_note(data)
     if r["blockers"]:
         out += ["#### Blockers (S-DEV-007)", ""] + [f"- {esc(b)}" for b in r["blockers"]] + [""]
     if data["pr"]:
@@ -173,6 +173,18 @@ def render_main(data, meta, applied, sandbox, args):
     return "\n".join(out) + "\n"
 
 
+def turn_limit_note(data):
+    """A harness-made warning (numbers only): the run used every allowed turn, so its output may be cut short."""
+    limit = data.get("turn_limit_reached")
+    if not isinstance(limit, dict):
+        return []
+    turns, cap = limit.get("num_turns"), limit.get("max_turns")
+    if not all(isinstance(x, int) and not isinstance(x, bool) for x in (turns, cap)):
+        return []
+    return [f"> **Turn limit reached:** this run used {turns} of {cap} turns (MAX_TURNS), so its output may be cut "
+            "short. Check that the files match the summary before review.", ""]
+
+
 def pr_block_marker(pr):
     raw = json.dumps(pr, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     return PR_BLOCK_MARKER.format(base64.b64encode(raw).decode("ascii"))
@@ -199,7 +211,7 @@ def pr_title(pr, issue):
 def render_pr_body(data, meta, applied, sandbox, args):
     out = [f"Developer change for #{args.issue} (stage 2, S-GEN-052). Ticket kind: {esc(meta['ticket_kind'])}"
            f" ({esc(meta['work'])}) · Area: {esc(meta['area'] or 'none')}", "",
-           "#### Decide first", "", quote(data["decision_summary"]), ""]
+           "#### Decide first", "", quote(data["decision_summary"]), ""] + turn_limit_note(data)
     out += render_pr(data["pr"]) + render_files(applied, data["proposed_files"])
     out += render_sandbox(sandbox, (meta.get("code_map_entry") or {}).get("sandbox"))
     if data["assumptions"]:

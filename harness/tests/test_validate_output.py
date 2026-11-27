@@ -7,7 +7,7 @@ import unittest
 from helpers import SCHEMA, fixture, load, run_cli
 
 from common import HarnessError
-from validate_output import check_harness, check_run, check_schema, extract
+from validate_output import check_harness, check_run, check_schema, extract, turn_limit
 
 AREAS = ["orders", "billing"]
 
@@ -46,6 +46,22 @@ class ValidateTest(unittest.TestCase):
         self.assertEqual(extract(envelope(result=json.dumps(out))), out)
 
     # --- envelope and cost ---------------------------------------------------
+    def test_turn_limit(self):
+        env = envelope(num_turns=40)
+        old = os.environ.get("MAX_TURNS")
+        try:
+            os.environ["MAX_TURNS"] = "40"
+            self.assertEqual(turn_limit(env), {"num_turns": 40, "max_turns": 40})
+            self.assertIsNone(turn_limit(envelope(num_turns=39)))
+            self.assertIsNone(turn_limit(envelope(num_turns=True)))
+            os.environ["MAX_TURNS"] = "forty"
+            self.assertIsNone(turn_limit(env))
+            del os.environ["MAX_TURNS"]
+            self.assertIsNone(turn_limit(env))
+        finally:
+            if old is not None:
+                os.environ["MAX_TURNS"] = old
+
     def test_cost_cap(self):
         self.assertReason("cost_cap", check_run, envelope(total_cost_usd=3.01), 3.0)
         check_run(envelope(total_cost_usd=3.0), 3.0)
