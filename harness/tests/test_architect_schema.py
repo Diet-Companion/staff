@@ -129,6 +129,14 @@ class ArchitectMutationTest(unittest.TestCase):
         del out["decision_summary"]
         self.assertInvalid(out)
 
+    def test_spec_document_cap_is_200000(self):
+        out = self.design()
+        doc = out["spec_versions"][0]["document"]
+        out["spec_versions"][0]["document"] = doc + " " * (100_000 - len(doc))  # a spec the size IF-001 is heading to
+        check_schema(out, self.schema)
+        out["spec_versions"][0]["document"] = doc + " " * (200_001 - len(doc))
+        self.assertInvalid(out)
+
     def test_free_text_over_2000(self):
         out = self.design()
         out["decision_summary"] = "x" * 2001

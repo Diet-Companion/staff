@@ -720,10 +720,10 @@
           "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$"
         },
         "document": {
-          "description": "The full spec as text. The harness validates it against its format's schema and caps each description string at 2,000 characters (S-ARCH-037).",
+          "description": "The full spec as text, at most 200,000 characters (raised from 60,000 by the operator, 2026-11-27: IF-001 1.6.0 alone is 59,009 compact). The harness validates it against its format's schema and caps each description string at 2,000 characters (S-ARCH-037).",
           "type": "string",
           "minLength": 1,
-          "maxLength": 60000
+          "maxLength": 200000
         }
       }
     },
