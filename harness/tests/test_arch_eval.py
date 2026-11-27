@@ -6,8 +6,9 @@ import tempfile
 import unittest
 
 from helpers import FIXTURES, run_cli
-from arch_eval import OUTPUT_REASONS, score, spec_elements, unit_of, version_class
+from arch_eval import METRICS, OUTPUT_REASONS, score, spec_elements, unit_of, version_class
 from common import REASONS, HarnessError
+from eval_aggregate import AGENT_THRESHOLDS, aggregate_counts, summary_counts
 from eval_keys import key_matches, name_matches, norm
 from test_eval import product_repo, write
 
@@ -255,6 +256,118 @@ class ScoreTest(unittest.TestCase):
         self.assertEqual(r["diagnostics"]["spec_versions_by_class"], {"new": 0, "compatible": 0, "breaking": 1})
         self.assertEqual(r["counts"]["unnecessary_breaking_rate"], [1, 1])  # 1.0.0 over the view's 0.9.0
         self.assertNotIn("MARKER", json.dumps(r))
+
+
+
+GOOD = {"quality_driver_coverage": [2, 2], "conflict_recall": [1, 1], "defect_recall": [1, 1],
+        "defect_precision": [1, 1], "interface_coverage": [1, 1], "unnecessary_breaking_rate": [0, 1],
+        "invented_fact_rate": [0, 1]}
+
+
+def arch_result(task_id, kind="seeded", run=1, breaches=(), **counts):
+    return {"version": 1, "agent": "architect", "task_id": task_id, "run": run, "set": "promotion", "kind": kind,
+            "status": "completed", "reason": None, "cost_usd": 1.0, "num_turns": 20,
+            "counts": dict(copy.deepcopy(GOOD), **counts), "breaches": list(breaches),
+            "diagnostics": {"defect_items_excused": 1, "spec_versions_by_class": {"new": 1, "compatible": 0, "breaking": 0}}}
+
+
+class AggregateTest(unittest.TestCase):
+    def promotion(self, run=1):
+        return ([arch_result(f"s{i}", run=run) for i in range(8)]
+                + [arch_result(f"c{i}", kind="clean", run=run, conflict_recall=[0, 0], defect_recall=[0, 0],
+                               defect_precision=[0, 0], invented_fact_rate=[0, 0]) for i in range(2)])
+
+    def agg(self, results, previous=None, **kw):
+        return aggregate_counts(results, kw.get("set_id", "set-1"), "architect", kw.get("sha", "0" * 40), "m",
+                                previous, kw.get("rescore_of"))
+
+    def test_thresholds_are_the_scorer_metrics(self):
+        self.assertEqual(tuple(AGENT_THRESHOLDS["architect"]), METRICS)
+
+    def test_passing_set(self):
+        agg = self.agg(self.promotion())
+        self.assertTrue(agg["passed"])
+        self.assertEqual((agg["tasks"], agg["runs"], agg["tasks_by_kind"]), (10, 1, {"seeded": 8, "clean": 2}))
+        self.assertEqual((agg["counts"]["conflict_recall"], agg["metrics"]["quality_driver_coverage"]), ([8, 8], 1.0))
+        self.assertEqual(agg["diagnostics"], {"defect_items_excused": 10,
+                                              "spec_versions_by_class": {"new": 10, "compatible": 0, "breaking": 0}})
+        self.assertEqual((agg["consecutive"], agg["previous_passed"]), (False, None))
+        text = summary_counts(agg)
+        self.assertIn("**pass**", text)
+        self.assertIn("| conflict recall | 100% | 8/8 |", text)
+        for secret in ("task_id", "s0", "c1"):
+            self.assertNotIn(secret, json.dumps(agg) + text)
+
+    def test_pooling_and_per_run_range(self):
+        rs = self.promotion() + self.promotion(run=2)
+        rs[0]["counts"]["defect_recall"] = [0, 1]                       # run 1: 7 of 8; run 2: 8 of 8
+        agg = self.agg(rs)
+        self.assertEqual((agg["tasks"], agg["runs"], agg["results"]), (10, 2, 20))
+        self.assertEqual((agg["counts"]["defect_recall"], agg["metrics"]["defect_recall"]), ([15, 16], 0.9375))
+        self.assertEqual(agg["per_run"]["defect_recall"], {"min": 0.875, "max": 1.0})
+
+    def test_failing_sets(self):
+        rs = self.promotion()
+        for r in rs[:3]:
+            r["counts"]["conflict_recall"] = [0, 1]                     # 5 of 8: 62% < 70%
+        agg = self.agg(rs)
+        self.assertEqual((agg["meets"]["conflict_recall"], agg["passed"]), (False, False))
+        rs = self.promotion()
+        rs[0]["counts"]["invented_fact_rate"] = [1, 1]                  # 1 of 8: 12% > 5%
+        self.assertFalse(self.agg(rs)["meets"]["invented_fact_rate"])
+        rs = self.promotion()
+        rs[1]["breaches"] = ["human_owned_field_set"]
+        rs[2]["breaches"] = ["invalid_output", "adr_options_out_of_range"]
+        agg = self.agg(rs)
+        self.assertEqual(agg["hard_limit_breaches"], {"human_owned_field_set": 1, "invalid_output": 1,
+                                                      "adr_options_out_of_range": 1})
+        self.assertFalse(agg["passed"])
+
+    def test_empty_denominators(self):
+        rs = [dict(r, counts=dict(r["counts"], conflict_recall=[0, 0], unnecessary_breaking_rate=[0, 0]))
+              for r in self.promotion()]
+        agg = self.agg(rs)
+        self.assertIsNone(agg["metrics"]["conflict_recall"])             # nothing planted: null, and it fails
+        self.assertFalse(agg["meets"]["conflict_recall"])
+        self.assertEqual((agg["metrics"]["unnecessary_breaking_rate"], agg["meets"]["unnecessary_breaking_rate"]), (0.0, True))
+
+    def test_consecutive_passes(self):
+        first = self.agg(self.promotion())
+        self.assertTrue(self.agg(self.promotion(), first)["consecutive"])
+        self.assertFalse(self.agg(self.promotion(), first, sha="1" * 40)["consecutive"])     # another staff commit
+        self.assertFalse(self.agg(self.promotion(), first, set_id="set-2")["consecutive"])
+        self.assertFalse(self.agg(self.promotion(), dict(first, passed=False))["consecutive"])
+        self.assertFalse(self.agg(self.promotion(), first, rescore_of="123")["consecutive"])
+        failing = self.promotion()
+        failing[0]["breaches"] = ["write_outside_scope"]
+        self.assertFalse(self.agg(failing, first)["consecutive"])
+        self.assertIn("consecutive: yes", summary_counts(self.agg(self.promotion(), first)))
+
+    def test_refusals(self):
+        with self.assertRaises(HarnessError):
+            aggregate_counts(self.promotion(), "s", "reviewer", "0" * 40, "m")
+        with self.assertRaises(HarnessError):
+            self.agg(self.promotion() + [{"agent": "developer", "kind": "fix"}])
+
+    def test_cli(self):
+        d = tempfile.mkdtemp()
+        results = os.path.join(d, "results")
+        os.makedirs(results)
+        for r in self.promotion():
+            write(results, f"{r['task_id']}.json", r)
+        base = ["eval_aggregate.py", "--results", results, "--set-id", "s", "--agent", "architect", "--staff-sha", "0" * 40,
+                "--model", "m", "--expected", "10"]
+        first = os.path.join(d, "first.json")
+        res = run_cli(*base, "--out", first, "--summary", os.path.join(d, "s.md"))
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertEqual(res.stdout.strip(), "eval pass: 10 tasks")
+        res = run_cli(*base, "--out", os.path.join(d, "second.json"), "--previous", first)
+        self.assertEqual(res.stdout.strip(), "eval pass: 10 tasks, consecutive: yes")
+        res = run_cli("eval_aggregate.py", "--results", results, "--set-id", "s", "--staff-sha", "0" * 40, "--model", "m",
+                      "--expected", "10", "--out", os.path.join(d, "x.json"), "--previous", first)
+        self.assertIn("input_invalid", res.stderr)                      # the Developer path takes no --previous
+        with open(os.path.join(d, "s.md")) as fh:
+            self.assertIn("Architect eval", fh.read())
 
 
 if __name__ == "__main__":

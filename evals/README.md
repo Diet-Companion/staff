@@ -73,3 +73,8 @@ interface coverage, unnecessary-breaking rate and invented-fact rate. It also re
 (invalid output, an ADR without 2 to 4 options, a human-owned field set, a write outside scope) and
 diagnostics. Keys are compared by `eval_keys.py`: case, `_`, `-` and spaces are normalised, and the spec's
 aliases count.
+
+**Aggregate** (`eval_aggregate.py --agent architect`): pools each metric's counts over bundle x run (S-GEN-035)
+against the S-ARCH-049 thresholds, with the per-run range beside it. Any breach fails the run. With
+`--previous <last aggregate>`, `consecutive: yes` means that aggregate passed for the same set, staff commit
+and model, and this one passed too.
