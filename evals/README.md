@@ -63,6 +63,15 @@ Each is scored by script on its spec keys; promotion needs two consecutive passi
 A seeded bundle has 0 to 2 conflicts, at most 1 defect and exactly 1 unknown figure; a clean bundle
 (`spec.clean: true`) has none. Both have 1 to 3 quality drivers.
 
+**Seeding:** `seed_task.py request --agent architect` adds the slot's `plan`, the exact plant counts from
+`ARCH_SLOT_PLAN` (slot numbers never reach the bundle). The seeding agent returns
+`plugins/staff-meta/schemas/seeder-architect-output.schema.json` (contract `seeder-architect`), and
+`seed_task.py assemble --agent architect` turns it into a bundle. Seeded promotion bundles are holdout seeds.
+`arch_eval.py check` is the validity check (S-GEN-067). It needs no secrets and runs no product code:
+ready-gate items 1 to 4 on the overlay requirements, live targets for every key, no source stating the
+unknown figure, the slot's plan, no leak of a plant into what the agent sees, and the input cap. On a pass
+it writes `spec_counts`.
+
 To run the Architect on a bundle: `eval_task.py materialize --agent architect --layers overlay` builds the
 tree it sees, and `eval_task.py event --agent architect` writes the synthetic `arch:design` event and the
 comment list for `build_input.py --agent architect`.
