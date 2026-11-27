@@ -27,7 +27,7 @@ REASONS = {
     "unknown_finding",
     # architect output (validate_output.py --agent architect)
     "trigger_mismatch", "constraint_id_mismatch", "option_mismatch", "owner_field_set", "spec_invalid",
-    "unknown_reference",
+    "unknown_reference", "assumption_id_used",
     # developer (dev_bundle.py, code_map.py, validate_output.py --agent developer, work_sandbox.py)
     "code_map_invalid", "kind_mismatch", "ticket_mismatch", "not_ready", "path_out_of_scope", "flag_missing",
     "case_clash",

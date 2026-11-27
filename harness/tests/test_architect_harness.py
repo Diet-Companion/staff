@@ -248,6 +248,24 @@ class CheckArchitectTest(unittest.TestCase):
                 run(revision)
             self.assertEqual(ctx.exception.reason, "revision_rewritten")
 
+    def test_assumption_ids_are_one_namespace_with_main(self):
+        doc = load("architect-design.json")
+        key = doc["assumptions"][0]["key"]
+        other = {"entity": "day_total", "target_id": None, "attribute": "rounding"}
+
+        def on_main(*keys):
+            return {f"ADR-00{n}": {"id": f"ADR-00{n}", "status": "accepted", "assumptions": [{"id": "A-001", "key": k}]}
+                    for n, k in enumerate(keys, 1)}
+
+        check_architect(doc, expect_for(doc), truth=on_main(key))  # the same assumption, carried
+        check_architect(doc, expect_for(doc), truth=on_main(other, key))  # an older clash on main stays carried
+        with self.assertRaises(HarnessError) as ctx:
+            check_architect(doc, expect_for(doc), truth=on_main(other))  # #174: a new assumption reused an ID
+        self.assertEqual(ctx.exception.reason, "assumption_id_used")
+        self.assertIn("ADR-001 on main", str(ctx.exception))
+        self.adr(doc)["assumptions"][0]["key"] = other  # one ID, two assumptions in the same output
+        self.assert_reason(doc, "assumption_id_used")
+
     def test_architecture_truth_reads_front_matter(self):
         d = tempfile.mkdtemp()
         os.makedirs(os.path.join(d, "architecture", "system", "adr"))

@@ -224,6 +224,29 @@ def check_revision_append_only(new, cur, where):
         raise HarnessError("revision_rewritten", f"{where}/revision changes or drops entries that are on main")
 
 
+def check_assumption_ids(out, truth):
+    """Assumption IDs are one namespace across architecture/** (S-ARCH-005). An ID already on main keeps
+    the key it has there (an older clash on main stays carried as it is); a new ID names one assumption."""
+    on_main = {}
+    for fm in truth.values():
+        for a in fm.get("assumptions") or []:
+            if isinstance(a, dict) and a.get("id"):
+                on_main.setdefault(a["id"], {})[_canonical(a.get("key"))] = fm.get("id")
+    found = [(f"/assumptions/{i}", a) for i, a in enumerate(out["assumptions"])]
+    for i, art in enumerate(out["artifacts"]):
+        found += [(f"/artifacts/{i}/assumptions/{j}", a) for j, a in enumerate(art.get("assumptions") or [])]
+    new = {}
+    for where, a in found:
+        key = _canonical(a["key"])
+        if a["id"] in on_main:
+            if key not in on_main[a["id"]]:
+                first = sorted(on_main[a["id"]].values())[0]
+                raise HarnessError("assumption_id_used", f"{where}/id is already used by {first} on main for "
+                                   "another assumption; number a new one after the highest ID in architecture/**")
+        elif new.setdefault(a["id"], (key, where))[0] != key:
+            raise HarnessError("assumption_id_used", f"{where}/id is used by {new[a['id']][1]} for another assumption")
+
+
 def check_architect(out, expect, stage=1, truth=None):
     """Architect checks JSON Schema can't express (S-ARCH-037). Raises on the first failing check.
 
@@ -256,6 +279,7 @@ def check_architect(out, expect, stage=1, truth=None):
     for name, values in ids.items():
         if dupes(values):
             raise HarnessError("duplicate_id", f"duplicate IDs in {name}")
+    check_assumption_ids(out, truth)
 
     # Stage 1: drafts only, and no human-owned field without a cited operator answer (S-ARCH-011, -020).
     operator_refs = {c["ref"] for c in expect["untrusted"]["comments"] if c["author_kind"] == "operator"}
