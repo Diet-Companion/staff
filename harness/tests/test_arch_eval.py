@@ -103,6 +103,9 @@ class ScoreTest(unittest.TestCase):
         self.assertEqual([covered(99.95, "percent", floor), covered(99.0, "%", floor)], [1, 0])
         rate = {"value": 50, "unit": "per second", "direction": "min"}
         self.assertEqual([covered(3000, "requests per minute", rate), covered(2999, "req/min", rate)], [1, 0])
+        taps = {"value": 3, "unit": "taps", "direction": "max"}             # a count the table doesn't know
+        self.assertEqual([covered(3, "taps", taps), covered(2, "Tap", taps), covered(4, "taps", taps),
+                          covered(3, "clicks", taps), covered(3, "ms", taps)], [1, 1, 0, 0, 0])
         o = copy.deepcopy(DESIGN)
         o["artifacts"][0]["req"] = "REQ-099"                              # a QAS for another REQ
         self.assertEqual(self.score(out=o)["counts"]["quality_driver_coverage"], [0, 1])
@@ -122,6 +125,15 @@ class ScoreTest(unittest.TestCase):
         not_excused = item("REQ-012/AC-002", "untestable")
         r = self.score(out=self.out(defect_items=[hit, excused, not_excused]))
         self.assertEqual((r["counts"]["defect_precision"], r["diagnostics"]["defect_items_excused"]), ([1, 2], 1))
+        at_ac = bundle(conflicts=[dict(PLANT, location="requirements/orders/REQ-014.md REQ-014/AC-003",
+                                       constraint_id="ADR-001/C-002")])
+        r = self.score(at_ac, self.out(defect_items=[item("REQ-014/AC-003", "contradicts"),
+                                                     item("REQ-014/AC-001", "contradicts")]))
+        self.assertEqual(r["diagnostics"]["defect_items_excused"], 1)      # the located AC only
+        at_req = bundle(conflicts=[dict(PLANT, location="requirements/orders/REQ-014.md", constraint_id="ADR-001/C-002")])
+        r = self.score(at_req, self.out(defect_items=[item("REQ-014/AC-001", "contradicts"),
+                                                      item("REQ-015/AC-001", "contradicts")]))
+        self.assertEqual(r["diagnostics"]["defect_items_excused"], 1)      # an AC of the located REQ
         r = self.score(bundle("clean"), self.out(defect_items=[hit]))     # clean: every item is false
         self.assertEqual((r["counts"]["defect_recall"], r["counts"]["defect_precision"]), ([0, 0], [0, 1]))
 
