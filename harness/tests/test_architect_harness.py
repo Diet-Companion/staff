@@ -13,7 +13,7 @@ from common import HarnessError
 from prepare_agent import build_prompt, cli_schema
 from render_architect import MAX_COMMENT_CHARS, fenced, render, req_tickets
 from run_record import role_fields
-from validate_output import architecture_truth, check_architect, check_schema
+from validate_output import architecture_truth, check_architect, check_schema, order_questions
 
 PLUGINS = os.path.join(STAFF, "plugins")
 AGENT = os.path.join(PLUGINS, "staff-engineering", "agents", "architect.md")
@@ -293,6 +293,8 @@ class CheckArchitectTest(unittest.TestCase):
         doc = load("architect-design.json")
         doc["questions"][0]["priority"] = 5
         self.assert_reason(doc, "blocking_order")
+        self.assertTrue(order_questions(doc))   # the CLI renumbers first, as for the developer and test-gen
+        check_architect(doc, expect_for(doc))
 
 
 class RenderTest(unittest.TestCase):
