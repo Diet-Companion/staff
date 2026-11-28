@@ -733,6 +733,7 @@ def main():
             if not args.input:
                 raise HarnessError("input_invalid", "--input is required with --agent architect")
             truth = architecture_truth(args.product_dir) if args.product_dir else {}
+            result["questions_reordered"] = order_questions(out)
             check_architect(out, load_json(args.input, "input_invalid"), args.stage, truth)
         elif args.agent == "developer":
             if not args.input:

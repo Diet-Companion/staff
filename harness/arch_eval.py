@@ -113,6 +113,17 @@ WINDOW = 120
 NUMBER = r"(?<![\w.])\d+(?:[.,]\d+)?"
 
 
+LOCATED_RE = re.compile(r"REQ-[0-9]{3,}(?:/AC-[0-9]{3,})?")
+
+
+def located(conflict):
+    """The REQ or AC a conflict plant sits on, from its location (a path, or a path and an ID). A
+    contradicts item there is the S-ARCH-017 reading of the same clash, so it is excused (D3).
+    A located AC excuses that AC only; a located REQ with no AC excuses the REQ and its ACs."""
+    ids = set(LOCATED_RE.findall(str(conflict.get("location") or "")))
+    return {i for i in ids if "/" in i} or ids
+
+
 def singular(word):
     return word[:-1] if len(word) > 3 and word.endswith("s") else word
 
@@ -128,9 +139,17 @@ def unit_of(text):
     return None
 
 
+def unit_name(text):
+    return singular(re.sub(r"\s+", " ", str(text or "").casefold()).strip())
+
+
 def meets_target(measure, target):
-    """True when a QAS measure is the target or stricter, in the same unit dimension."""
+    """True when a QAS measure is the target or stricter, in the same unit dimension. A unit the table
+    doesn't know (a count such as taps or items) matches only itself, with factor 1."""
     got, want = unit_of(measure.get("unit")), unit_of(target["unit"])
+    if not got and not want and unit_name(measure.get("unit")) and \
+            unit_name(measure.get("unit")) == unit_name(target["unit"]):
+        got = want = (unit_name(target["unit"]), 1)
     value = measure.get("value")
     if not got or not want or got[0] != want[0] or not isinstance(value, (int, float)) or isinstance(value, bool):
         return False
@@ -318,9 +337,11 @@ def score(task, record, validated, validation, truth, areas, run=1):
     counts["conflict_recall"][0] = sum(1 for c in conflicts if named & {c["constraint_id"], *(c.get("also") or [])})
 
     items = validated["defect_items"]
-    excusable = {t for c in conflicts for t in c.get("also_defect_targets") or []}
+    excusable = {t for c in conflicts for t in [*(c.get("also_defect_targets") or []), *located(c)]}
+    excusable_reqs = {t for c in conflicts for t in located(c) if "/" not in t}
     matching = [i for i in items if any(trap_matches(d, i) for d in defects)]
-    excused = [i for i in items if i not in matching and i["kind"] == "contradicts" and i["target"] in excusable]
+    excused = [i for i in items if i not in matching and i["kind"] == "contradicts"
+               and (i["target"] in excusable or i["target"].split("/")[0] in excusable_reqs)]
     counts["defect_recall"][0] = sum(1 for d in defects if any(trap_matches(d, i) for i in items))
     counts["defect_precision"] = [len(matching), len(items) - len(excused)]
     diag["defect_items_excused"] = len(excused)
