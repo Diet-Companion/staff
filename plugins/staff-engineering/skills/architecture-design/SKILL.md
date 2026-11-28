@@ -34,7 +34,7 @@ You raise requirement problems only as requirement-defect items (S-BA-048) on th
 - contradicting targets, or an AC against an accepted ADR → `contradicts`;
 - unachievable target → `infeasible`.
 
-Each item names one REQ or AC ID and its evidence refs. If a defect blocks the design, draft nothing that depends on it and say so in `decision_summary`.
+Each item names one REQ or AC ID and its evidence refs. If a defect blocks part of the design, draft nothing that depends on it and say so in `decision_summary`; the rest of the need, and the QAS of every driver, are still drafted. A target with a number and a unit is not `untestable`: record an unstated measurement point, window or counting rule as an open assumption on the QAS.
 
 ## ADRs and the human's decision (S-ARCH-018, S-ARCH-006)
 
@@ -42,7 +42,7 @@ Each item names one REQ or AC ID and its evidence refs. If a defect blocks the d
 - Each option states what it satisfies, pros, cons, cost, reversibility (`two-way`, `costly`, `one-way`), risks, the constraints it would impose, what it affects, consequences and cites. A one-way option needs a reason or evidence. An uncited cost is an open assumption.
 - Options carry their own constraints, so acceptance only selects an option. Each constraint has `check:` a conformance rule ref under `architecture/<area>/conformance/`, or `review` (it then goes to the developer's code checklist, S-ARCH-026).
 - Set `recommended` (option key and reason). It must follow from the drivers. Never set `decision`.
-- **Conflicts:** if an option would break a constraint of an accepted ADR, list it in `conflicts[]` with `resolution: supersede` (the ADR supersedes the old one) or `avoid` (the option is shaped to avoid it).
+- **Conflicts:** if an option would break a constraint of an accepted ADR, list it in `conflicts[]` with `resolution: supersede` (the ADR supersedes the old one) or `avoid` (the option is shaped to avoid it). Check the recommended option too. A ready AC that asks for what an accepted constraint forbids gets both a `contradicts` item and an option that meets it as written, listed with `resolution: supersede`: only the human chooses between changing the AC and superseding the constraint.
 - **At most 3 ADRs** per design need *(starting value)*. A need with more is split in driver order; say in `decision_summary` what is left.
 - **One question per ADR**, in the S-BA-014 form, with `adr` set. Its option ids are the ADR's option keys, and its `recommended` is the ADR's.
 - **Answers:** the human answers with a comment. Record it (S-ARCH-020) in `answers_applied`. If the human names an option you didn't draft, add it as a new option; that needs a new review (S-ARCH-019).
@@ -52,7 +52,7 @@ Each item names one REQ or AC ID and its evidence refs. If a defect blocks the d
 - **Spec first.** A version is approved by a design PR before code changes. Approved and deprecated versions are the expected values for their own version (S-TESTAB-006).
 - Put each new or changed version's **full spec** in `spec_versions[]`, in the format the product stack uses (for example OpenAPI, AsyncAPI, SDL, `.proto`, JSON Schema). Every element carries a structured unit where it has one and a structured security requirement. Every description string is at most 2,000 characters.
 - **Editable drafts.** An approved version stays editable until the first PR that declares it in `implements` merges, or a consumer is on that version. Changes to an editable draft still go through a design PR, but are not breaking.
-- **Breaking changes** arrive only as a new major version, and the previous major becomes deprecated. Treat a removed or renamed element, a narrowed input, a changed type, and a changed description, unit or security requirement as breaking. If unsure, it is breaking.
+- **Breaking changes** arrive only as a new major version, and the previous major becomes deprecated. At stage 1 the new major is `draft` and the old one keeps its status on `main`: propose the deprecation in `decision_summary`. Treat a removed or renamed element, a narrowed input, a changed type, and a changed description, unit or security requirement as breaking. If unsure, it is breaking.
 - **Public** versions: a deprecated version gets a `sunset` at least 90 days after deprecation *(starting value)*. **Internal** versions carry no `sunset`; retire one only once the conformance check shows no consumer left on it.
 - **Never** remove a public version before its sunset, or any version while a consumer is still on it.
 - `compatibility_policy` is human-owned: propose it in the decision summary or a question, and leave it `null` until answered.

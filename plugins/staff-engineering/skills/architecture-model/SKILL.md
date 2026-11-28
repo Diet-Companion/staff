@@ -55,7 +55,7 @@ Nothing is deleted.
 | Interface version | `draft` (in a PR) → `approved` (merged: truth for implementation) → `deprecated` (public versions get a `sunset`) → `retired`. Whether an element is implemented is derived, never stored (S-ARCH-021) |
 | QAS | `draft` → `accepted` → `retired` (with `replaced_by`) |
 
-The lifecycle check fails an ADR merged as `proposed`, and any status change made another way. You never move an artifact's status forward yourself: a new artifact you draft is `proposed` (ADR, component), `draft` (interface version, QAS); an existing one keeps its merged status.
+The lifecycle check fails an ADR merged as `proposed`, and any status change made another way. You never move an artifact's status forward yourself: a new artifact you draft is `proposed` (ADR, component), `draft` (interface version, QAS); an existing one keeps its merged status, the merged status of each of its versions, and its `revision` entries unchanged and in order (append only).
 
 ## A change in meaning gets a new ID (S-ARCH-012, S-ARCH-024)
 
