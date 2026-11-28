@@ -312,7 +312,9 @@ def check_architect(out, expect, stage=1, truth=None):
             if decision["outcome"] == "accepted" and decision["chosen"] not in ids[f"{a['id']} options"]:
                 raise HarnessError("option_mismatch", f"/artifacts/{i}/decision/chosen is not one of its options")
         elif stage == 1 and a["type"] in ARCH_DRAFT_STATUS and a["status"] != ARCH_DRAFT_STATUS[a["type"]]:
-            raise HarnessError("stage_violation", f"/artifacts/{i}/status is not {ARCH_DRAFT_STATUS[a['type']]} at stage 1")
+            # Type and status are schema enums, so the detail stays harness text for blind eval logs.
+            raise HarnessError("stage_violation", f"/artifacts/{i} ({a['type']}) has status {a['status']}, not "
+                               f"{ARCH_DRAFT_STATUS[a['type']]} at stage 1; its ID has no file on main")
         if stage == 1 and a["type"] == "interface":
             # New versions are drafts; a version on main keeps its status there.
             kept = {v.get("version"): v.get("status") for v in cur.get("versions") or [] if isinstance(v, dict)}

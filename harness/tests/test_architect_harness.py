@@ -135,6 +135,9 @@ class CheckArchitectTest(unittest.TestCase):
         doc = load("architect-design.json")
         self.adr(doc)["status"] = "accepted"
         self.assert_reason(doc, "stage_violation")
+        with self.assertRaises(HarnessError) as ctx:
+            check_architect(doc, expect_for(doc))
+        self.assertIn("(adr) has status accepted, not proposed", str(ctx.exception))   # enums only: blind-safe
         doc = load("architect-design.json")
         iface = next(a for a in doc["artifacts"] if a["type"] == "interface")
         iface["versions"][0]["status"] = "approved"
