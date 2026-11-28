@@ -24,6 +24,8 @@
             spec_leak                           corrected text or a telltale word in the overlay or ticket
             bundle_too_large                    the agent's input or the overlay is over its cap
             assumption_id_clash                 an overlay assumption reuses an ID on base for another key
+            arch_ref_dangling                   the overlay or ticket names an ADR, CMP or IF with no file
+                                                on base + overlay
   score   Match one run's validated output to the bundle's spec by key, and write the result: a count
           [matched, out of] per metric, the hard-limit breaches, and diagnostics. Inputs are the bundle, the
           product checkout at its base commit, and the agent job's run record, validation result and
@@ -113,6 +115,7 @@ WINDOW = 120
 NUMBER = r"(?<![\w.])\d+(?:[.,]\d+)?"
 
 
+ARCH_ID_RE = re.compile(r"\b((?:ADR|CMP|IF)-[0-9]{3,})(?![0-9])")
 LOCATED_RE = re.compile(r"REQ-[0-9]{3,}(?:/AC-[0-9]{3,})?")
 
 
@@ -585,6 +588,11 @@ def check_bundle(task, product_dir, work, plan=None, req_schema=None):
         check_assumption_ids({"assumptions": [], "artifacts": arts}, architecture_truth(base))
     except HarnessError:
         failures.append({"code": "assumption_id_clash"})
+
+    # 12. Every ADR, component or interface the overlay or ticket names has its own file on the view: a
+    # dangling ID makes "re-emit it as it is" look right to the Architect, which then fails stage 1.
+    failures += [{"code": "arch_ref_dangling", "path": p, "id": i} for p, text in seen
+                 for i in sorted(set(ARCH_ID_RE.findall(text))) if i not in truth["arch"]]
 
     task["spec_counts"] = {k: len(spec[k]) for k in SPEC_KEYS}
     return task, failures

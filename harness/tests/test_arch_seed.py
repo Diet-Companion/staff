@@ -198,6 +198,15 @@ class CheckTest(unittest.TestCase):
         same = {"path": "architecture/catalog/adr/ADR-002.md", "content": md(dict(ADR, id="ADR-002"))}
         self.assertEqual(self.codes(bundle(overlay=overlay() + [same])), [])            # same ID, same key
 
+    def test_dangling_arch_refs(self):
+        t = bundle()
+        t["ticket"]["body"] += "\nKeep CMP-099 and IF-099 as they are."   # named, but no file on the view
+        self.assertEqual(self.codes(t), ["arch_ref_dangling", "arch_ref_dangling"])
+        named = {"path": "architecture/catalog/adr/ADR-002.md", "content": md(dict(ADR, id="ADR-002"))}
+        t = bundle(overlay=overlay() + [named])
+        t["ticket"]["body"] += "\nSee ADR-002 and ADR-002/C-001."          # its file is in the overlay
+        self.assertEqual(self.codes(t), [])
+
     def test_cli(self):
         d = tempfile.mkdtemp()
         out, out_task = os.path.join(d, "check.json"), os.path.join(d, "task.json")
