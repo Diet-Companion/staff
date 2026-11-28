@@ -34,7 +34,7 @@ You raise requirement problems only as requirement-defect items (S-BA-048) on th
 - contradicting targets, or an AC against an accepted ADR → `contradicts`;
 - unachievable target → `infeasible`.
 
-Each item names one REQ or AC ID and its evidence refs. If a defect blocks part of the design, draft nothing that depends on it and say so in `decision_summary`; the rest of the need, and the QAS of every driver, are still drafted. A target with a number and a unit is not `untestable`: record an unstated measurement point, window or counting rule as an open assumption on the QAS.
+Each item names one REQ or AC ID and its evidence refs. If a defect blocks part of the design, draft nothing that depends on it and say so in `decision_summary`; the rest of the need, and the QAS of every driver, are still drafted. `untestable` is a target with no number and unit, or an AC `then` with no observable expected value (S-BA-007); an unstated measurement point, window or counting rule on a numeric target is an open assumption on the QAS. Two ACs that can't both hold are `contradicts`, never an assumption that reads them together.
 
 ## ADRs and the human's decision (S-ARCH-018, S-ARCH-006)
 
